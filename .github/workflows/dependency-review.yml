@@ -10,6 +10,11 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    # Requires the repository's "Dependency graph" feature to be enabled
+    # (Settings -> Security -> Code security -> Dependency graph). Until it is,
+    # this job reports but does not block merges; pip-audit in ci.yml still
+    # covers dependency CVEs unconditionally.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Review dependency changes for known vulnerabilities & licenses
