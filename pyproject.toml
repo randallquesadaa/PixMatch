@@ -36,7 +36,7 @@ Issues = "https://github.com/randallquesadaa/PixMatch/issues"
 
 [project.optional-dependencies]
 video = ["imageio-ffmpeg>=0.5"]
-heif = ["pillow-heif>=0.16"]
+heif = ["pillow-heif>=1.7.0"]
 avif = ["pillow-avif-plugin>=1.4"]
 ai = ["open-clip-torch>=2.20", "torch>=2.0"]
 dev = [
