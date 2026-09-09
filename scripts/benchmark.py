@@ -59,7 +59,7 @@ def _build_library(root: str) -> int:
 
 
 def main() -> None:
-    root = tempfile.mkdtemp(prefix="da-bench-")
+    root = tempfile.mkdtemp(prefix="pixmatch-bench-")
     try:
         t0 = time.time()
         made = _build_library(root)
