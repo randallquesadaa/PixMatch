@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixmatch"
+version = "0.7.0"
+description = "Read-only desktop tool to find duplicate and near-duplicate images and videos"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "PySide6>=6.6,<7",
+    "Pillow>=10.2",
+    "Send2Trash>=1.8",
+]
+
+[project.optional-dependencies]
+video = ["imageio-ffmpeg>=0.5"]
+heif = ["pillow-heif>=0.16"]
+avif = ["pillow-avif-plugin>=1.4"]
+ai = ["open-clip-torch>=2.20", "torch>=2.0"]
+dev = ["pytest>=8.0", "pyinstaller>=6.0"]
+
+[project.gui-scripts]
+pixmatch = "app.main:main"
+
+[project.scripts]
+pixmatch-cli = "app.main:main"
+
+[tool.setuptools]
+packages = ["app", "app.core", "app.database", "app.ui", "app.ui.widgets", "app.workers", "app.utils"]
+
+[tool.setuptools.package-data]
+app = ["../packaging/resources/*.png"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

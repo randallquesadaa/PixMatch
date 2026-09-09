@@ -1,4 +1,4 @@
-# Duplicate Analyzer
+# PixMatch
 
 Herramienta de escritorio para bibliotecas de fotos y vídeos. Tiene dos
 pestañas:
@@ -15,8 +15,9 @@ pestañas:
 > permanente como modo aparte) y renombrar requieren confirmación, quedan en un
 > historial consultable y el renombrado se puede deshacer.
 
-Estado actual: **Las 6 fases + herramienta de renombrado** (v0.7.0) — ver [`ROADMAP.md`](ROADMAP.md)
-para el detalle por fase y los pendientes conscientes.
+Estado actual: **v0.7.0** — análisis de duplicados completo + herramienta de
+renombrado. Ver [`ROADMAP.md`](ROADMAP.md) para la arquitectura, las decisiones
+técnicas y las limitaciones conocidas.
 
 ---
 
@@ -63,7 +64,7 @@ para el detalle por fase y los pendientes conscientes.
   - **"Comparar en detalle"** con modos **Normal / Lado a lado / Diferencia /
     Superposición** (con slider de opacidad),
   - **Detección avanzada mediante IA** (embeddings visuales CLIP) — *opcional*,
-    `pip install "duplicate-analyzer[ai]"`; si no está instalada se usan solo
+    `pip install "pixmatch[ai]"`; si no está instalada se usan solo
     los métodos tradicionales.
 - **Análisis de vídeo** (Fase 4, *opcional* — necesita **FFmpeg**):
   - detección automática de FFmpeg/ffprobe (PATH → `imageio-ffmpeg`), con
@@ -341,9 +342,9 @@ de IA, si no hay backend de embeddings.
 ## Instalar como paquete (opcional)
 
 ```bash
-pip install .            # instala el comando `duplicate-analyzer`
+pip install .            # instala el comando `pixmatch`
 pip install ".[video]"   # + imageio-ffmpeg
-duplicate-analyzer
+pixmatch
 ```
 
 ---
@@ -354,19 +355,19 @@ duplicate-analyzer
 instalado. Ejecuta el script de tu plataforma **desde la raíz del proyecto**:
 
 ```bash
-packaging/build_linux.sh          # -> dist/DuplicateAnalyzer/DuplicateAnalyzer
-packaging/build_macos.sh          # -> dist/DuplicateAnalyzer.app  (genera .icns)
-packaging\build_windows.bat       # -> dist\DuplicateAnalyzer\DuplicateAnalyzer.exe
+packaging/build_linux.sh          # -> dist/PixMatch/PixMatch
+packaging/build_macos.sh          # -> dist/PixMatch.app  (genera .icns)
+packaging\build_windows.bat       # -> dist\PixMatch\PixMatch.exe
 ```
 
-O directamente: `pyinstaller packaging/DuplicateAnalyzer.spec --noconfirm`.
+O directamente: `pyinstaller packaging/PixMatch.spec --noconfirm`.
 
 Notas:
-- El build de Linux está probado (`dist/DuplicateAnalyzer/DuplicateAnalyzer
+- El build de Linux está probado (`dist/PixMatch/PixMatch
   --version` arranca; FFmpeg queda empaquetado). Windows/macOS deben
   compilarse en su propia plataforma (no hay cross-compilación).
 - macOS: app sin firmar; primera ejecución con clic derecho → Abrir, o
-  `xattr -dr com.apple.quarantine dist/DuplicateAnalyzer.app`.
+  `xattr -dr com.apple.quarantine dist/PixMatch.app`.
 - El ejecutable pesa ~270 MB (PySide6 + FFmpeg).
 
 ---
@@ -434,7 +435,7 @@ app/
     widgets/file_card.py, widgets/thumbnail_loader.py
   utils/
     paths.py, logging_setup.py, control.py, file_utils.py, thumbnail_cache.py
-packaging/    DuplicateAnalyzer.spec + build_{linux,macos,windows}.* + resources/icon.*
+packaging/    PixMatch.spec + build_{linux,macos,windows}.* + resources/icon.*
 scripts/      benchmark.py
 tests/
 ```
