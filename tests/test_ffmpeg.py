@@ -36,7 +36,8 @@ def test_configured_directory_is_resolved(tmp_path, ffmpeg_tools):
 
     directory = tmp_path / "bin"
     directory.mkdir()
-    linked = directory / "ffmpeg"
+    # detect() looks for exactly "ffmpeg" / "ffmpeg.exe" inside a configured dir
+    linked = directory / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
     shutil.copy2(ffmpeg_tools.ffmpeg, linked)
     tools = detect(configured_ffmpeg=str(directory))
     assert tools.available

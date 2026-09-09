@@ -54,7 +54,8 @@ def test_penalises_copy_name_and_backup_folder(tmp_path):
     )
     r = recommend_keep(_group([original, copy], MatchCategory.FILE_IDENTICAL))
     assert r.record is original
-    assert any("copia" in x or "backup" in x for x in r.reasons)
+    # the "copy" name + "Backup" folder must have pushed that record's score down
+    assert r.scores[id(copy)] < r.scores[id(original)]
 
 
 def test_exact_group_without_signal_has_low_confidence(tmp_path):

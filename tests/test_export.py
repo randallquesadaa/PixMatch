@@ -12,7 +12,8 @@ from app.core.export import export_csv, export_html, export_json
 def _result(tmp_path, make_image):
     import shutil
 
-    src = make_image(tmp_path / "carpeta" / "IMG <1>.jpg", size=(60, 40))
+    # "&" is filesystem-legal on every OS and still has to be HTML-escaped
+    src = make_image(tmp_path / "carpeta" / "IMG &1.jpg", size=(60, 40))
     shutil.copy2(src, tmp_path / "carpeta" / "IMG copia.jpg")
     make_image(tmp_path / "otra.jpg", size=(10, 10), color=(0, 255, 0))
     return run_analysis(str(tmp_path), AppConfig(workers=2, use_cache=False))
@@ -51,8 +52,8 @@ def test_html_is_self_contained_and_escaped(tmp_path, make_image):
 
     assert text.startswith("<!doctype html>")
     assert "MARCADO PARA ELIMINAR" in text
-    assert "IMG &lt;1&gt;.jpg" in text  # angle brackets escaped
-    assert "<IMG <1>" not in text  # never raw
+    assert "IMG &amp;1.jpg" in text  # ampersand escaped
+    assert "IMG &1.jpg" not in text  # never raw
     assert "data:image/png;base64," in text  # thumbnails embedded
 
 
