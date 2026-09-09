@@ -25,4 +25,4 @@ Send2Trash>=1.8  # Phase 3 - move files to the OS recycle bin (never a plain del
 # pillow-avif-plugin>=1.4 # AVIF support
 
 # --- development / testing ---
-pytest>=8.0
+pytest>=9.1.1
