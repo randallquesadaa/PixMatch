@@ -1,5 +1,10 @@
 # PixMatch
 
+[![CI](https://github.com/randallquesadaa/PixMatch/actions/workflows/ci.yml/badge.svg)](https://github.com/randallquesadaa/PixMatch/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/randallquesadaa/PixMatch/actions/workflows/codeql.yml/badge.svg)](https://github.com/randallquesadaa/PixMatch/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/randallquesadaa/PixMatch?sort=semver)](https://github.com/randallquesadaa/PixMatch/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Herramienta de escritorio para bibliotecas de fotos y vídeos. Tiene dos
 pestañas:
 
@@ -188,7 +193,29 @@ la nomenclatura** de una biblioteca de fotos/vídeos:
 
 ---
 
-## Instalación
+## Descargar (usuarios)
+
+Ejecutables listos para usar en la
+[**página de releases**](https://github.com/randallquesadaa/PixMatch/releases/latest)
+— no hace falta instalar Python:
+
+| Sistema | Archivo | Cómo se abre |
+|---|---|---|
+| Windows 10/11 (x64) | `PixMatch-*-windows-x64.zip` | descomprimir → `PixMatch.exe` |
+| macOS (Apple Silicon) | `PixMatch-*-macos-arm64.zip` | 1ª vez: clic derecho → *Abrir* |
+| Linux (x86-64) | `PixMatch-*-linux-x86_64.tar.gz` | extraer → `./PixMatch/PixMatch` |
+
+Los binarios no están firmados; verifica la descarga con el `SHA256SUMS.txt` de
+cada release. Para analizar **vídeos** hace falta FFmpeg instalado en el sistema
+(PixMatch lo detecta automáticamente); para **imágenes** no hace falta nada más.
+
+Cada release se genera automáticamente desde GitHub Actions cuando sube a `main`
+un cambio de versión que ha pasado toda la CI (tests en Linux/macOS/Windows,
+lint, análisis de seguridad).
+
+---
+
+## Instalación (desde el código)
 
 Requiere **Python 3.11+** (probado con 3.14).
 
@@ -267,21 +294,32 @@ python main.py "/ruta/a/mis fotos"
 
 ---
 
-## Tests
+## Tests y calidad de código
 
 ```bash
-pip install pytest
-pytest -q
+pip install -e ".[dev]"
+
+pytest                     # 169 tests (interfaz incluida, sin pantalla)
+ruff check .               # lint
+ruff format --check .      # formato
+bandit -c pyproject.toml -r app --severity-level medium   # análisis de seguridad
+pip-audit -r requirements.txt                             # CVEs en dependencias
 ```
 
-Los tests de interfaz se ejecutan sin pantalla:
+Los tests de interfaz usan `QT_QPA_PLATFORM=offscreen` (configurado en CI). Los
+de vídeo se **saltan automáticamente** si no hay FFmpeg; los de IA, si no hay
+backend de embeddings.
 
-```bash
-QT_QPA_PLATFORM=offscreen pytest -q
-```
+**Integración continua** (`.github/workflows/`): en cada Pull Request y en cada
+push a `main` se ejecutan, y **todo tiene que pasar**:
 
-**169 tests**. Los de vídeo se **saltan automáticamente** si no hay FFmpeg; los
-de IA, si no hay backend de embeddings.
+| Comprobación | Herramienta |
+|---|---|
+| Funcionalidad y fiabilidad | `pytest` en **Linux · macOS · Windows** × Python **3.11 / 3.12 / 3.13** (con FFmpeg, así los tests de vídeo corren de verdad) |
+| Estandarización de código | `ruff check` + `ruff format --check` |
+| Vulnerabilidades en el código | `bandit` (falla en severidad media+) y **CodeQL** (`security-and-quality`, semanal) |
+| Vulnerabilidades en dependencias | `pip-audit` + **dependency-review** (bloquea PRs con CVEs altas o licencias GPL) |
+| Dependencias al día | **Dependabot** semanal (pip + GitHub Actions) |
 
 - **Fase 1** — SHA-256 vs `hashlib`, idénticos / distintos / vacíos, rutas
   Unicode, cancelación, `partial_signature`; escaneo recursivo, exclusiones,
@@ -351,8 +389,26 @@ pixmatch
 
 ## Generar un ejecutable
 
-**PyInstaller**, one-folder, con FFmpeg embebido si `imageio-ffmpeg` está
-instalado. Ejecuta el script de tu plataforma **desde la raíz del proyecto**:
+**Lo normal es no tener que hacerlo**: los ejecutables de cada release los
+construye GitHub Actions (`.github/workflows/release.yml`) para las tres
+plataformas y quedan en la [página de releases](https://github.com/randallquesadaa/PixMatch/releases).
+
+El flujo de release automático:
+
+1. En un PR, subes la versión en `app/__init__.py` (`__version__`).
+2. Al fusionar a `main`, se ejecuta toda la CI.
+3. Si pasa y esa versión aún no tiene tag, Actions crea el tag `vX.Y.Z`,
+   compila en Linux/macOS/Windows con **PyInstaller** (one-folder) y publica un
+   Release con los tres archivos + `SHA256SUMS.txt`.
+
+Los binarios publicados **no** empaquetan `imageio-ffmpeg`: su FFmpeg es GPL y
+contaminaría la licencia del ejecutable. PixMatch se mantiene MIT y detecta un
+FFmpeg del sistema en tiempo de ejecución.
+
+### Compilar a mano
+
+Desde la raíz del proyecto, en la plataforma de destino (no hay
+cross-compilación):
 
 ```bash
 packaging/build_linux.sh          # -> dist/PixMatch/PixMatch
@@ -360,15 +416,13 @@ packaging/build_macos.sh          # -> dist/PixMatch.app  (genera .icns)
 packaging\build_windows.bat       # -> dist\PixMatch\PixMatch.exe
 ```
 
-O directamente: `pyinstaller packaging/PixMatch.spec --noconfirm`.
+O directamente: `pyinstaller packaging/PixMatch.spec --noconfirm`. Los scripts
+`build_*` sí instalan `imageio-ffmpeg`, así que un ejecutable hecho a mano lleva
+FFmpeg embebido (y por tanto **no** se puede redistribuir salvo bajo GPL).
 
-Notas:
-- El build de Linux está probado (`dist/PixMatch/PixMatch
-  --version` arranca; FFmpeg queda empaquetado). Windows/macOS deben
-  compilarse en su propia plataforma (no hay cross-compilación).
 - macOS: app sin firmar; primera ejecución con clic derecho → Abrir, o
   `xattr -dr com.apple.quarantine dist/PixMatch.app`.
-- El ejecutable pesa ~270 MB (PySide6 + FFmpeg).
+- El ejecutable pesa ~250 MB (PySide6), ~270 MB con FFmpeg embebido.
 
 ---
 

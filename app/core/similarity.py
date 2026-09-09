@@ -14,6 +14,7 @@ Phase 1 only ever produces FILE_IDENTICAL groups. The rest of the enum exists
 so the rest of the codebase (UI colours, filters, exports) is already built
 around the final taxonomy.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -25,57 +26,84 @@ class CategoryStyle:
     key: str
     label_es: str
     short_es: str
-    color: str      # hex, used by the UI
+    color: str  # hex, used by the UI
     emoji: str
     description_es: str
 
 
 class MatchCategory(Enum):
     FILE_IDENTICAL = CategoryStyle(
-        "file_identical", "Archivo idéntico", "IDÉNTICO",
-        "#2e7d32", "🟢",
+        "file_identical",
+        "Archivo idéntico",
+        "IDÉNTICO",
+        "#2e7d32",
+        "🟢",
         "Los bytes de los archivos son exactamente iguales (mismo SHA-256).",
     )
     PIXEL_IDENTICAL = CategoryStyle(
-        "pixel_identical", "Pixel por pixel idéntico", "PIXEL IDÉNTICO",
-        "#1565c0", "🔵",
+        "pixel_identical",
+        "Pixel por pixel idéntico",
+        "PIXEL IDÉNTICO",
+        "#1565c0",
+        "🔵",
         "Los archivos difieren, pero la imagen decodificada es exactamente igual.",
     )
     VISUALLY_IDENTICAL = CategoryStyle(
-        "visually_identical", "Visualmente idéntico", "VISUALMENTE IDÉNTICO",
-        "#00838f", "🟦",
+        "visually_identical",
+        "Visualmente idéntico",
+        "VISUALMENTE IDÉNTICO",
+        "#00838f",
+        "🟦",
         "Representa la misma imagen con diferencias técnicas menores.",
     )
     SAME_CONTENT_LIKELY = CategoryStyle(
-        "same_content_likely", "Mismo contenido probable", "MISMO CONTENIDO PROBABLE",
-        "#00838f", "🟦",
+        "same_content_likely",
+        "Mismo contenido probable",
+        "MISMO CONTENIDO PROBABLE",
+        "#00838f",
+        "🟦",
         "Los fotogramas muestreados coinciden con mucha probabilidad. No se "
         "garantiza al 100% porque solo se comparan unos pocos fotogramas.",
     )
     RESIZED_DUPLICATE = CategoryStyle(
-        "resized_duplicate", "Duplicado redimensionado", "REDIMENSIONADO",
-        "#0277bd", "🟦",
+        "resized_duplicate",
+        "Duplicado redimensionado",
+        "REDIMENSIONADO",
+        "#0277bd",
+        "🟦",
         "La misma imagen guardada a otra resolución (o compresión / formato).",
     )
     CROPPED_SIMILAR = CategoryStyle(
-        "cropped_similar", "Recorte de la misma imagen", "RECORTE",
-        "#ef6c00", "🟧",
+        "cropped_similar",
+        "Recorte de la misma imagen",
+        "RECORTE",
+        "#ef6c00",
+        "🟧",
         "Una imagen parece ser un recorte (encuadre parcial) de la otra.",
     )
     VERY_SIMILAR = CategoryStyle(
-        "very_similar", "Muy similar", "MUY SIMILAR",
-        "#f9a825", "🟡",
+        "very_similar",
+        "Muy similar",
+        "MUY SIMILAR",
+        "#f9a825",
+        "🟡",
         "Probablemente una variante de la otra (resolución, compresión, formato, "
         "ligeros cambios de brillo/color/recorte).",
     )
     SIMILAR = CategoryStyle(
-        "similar", "Similar", "SIMILAR",
-        "#ef6c00", "🟠",
+        "similar",
+        "Similar",
+        "SIMILAR",
+        "#ef6c00",
+        "🟠",
         "Parece la misma escena u objeto, con diferencias mayores. Revísala.",
     )
     DIFFERENT = CategoryStyle(
-        "different", "Diferente", "DIFERENTE",
-        "#c62828", "🔴",
+        "different",
+        "Diferente",
+        "DIFERENTE",
+        "#c62828",
+        "🔴",
         "No es un duplicado.",
     )
 
@@ -113,7 +141,7 @@ _RANK = {
 _EXACT = {MatchCategory.FILE_IDENTICAL, MatchCategory.PIXEL_IDENTICAL}
 
 
-def category_confidence(category: "MatchCategory", score: float | None) -> int:
+def category_confidence(category: MatchCategory, score: float | None) -> int:
     """A 0-100 confidence for the match label.
 
     Exact categories are 100 by construction. For the similarity family the
@@ -122,7 +150,7 @@ def category_confidence(category: "MatchCategory", score: float | None) -> int:
         return 100
     if score is None:
         return 0
-    return int(round(max(0.0, min(100.0, score))))
+    return round(max(0.0, min(100.0, score)))
 
 
 def classify_similarity(percent: float, threshold: float) -> MatchCategory:

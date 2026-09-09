@@ -10,21 +10,22 @@ A hash is a 64-bit integer. ``None`` means "could not be computed" (corrupt or
 unsupported image) and callers must treat that as "no perceptual information",
 never as "matches everything".
 """
+
 from __future__ import annotations
 
 import io
 import math
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from PIL import Image, ImageOps
 
 from app.utils.file_utils import extended_path
 
 HASH_BITS = 64
-BHASH_BITS = 256            # 16x16 block-mean "visual layout" hash
-_HASH_EDGE = 8               # 8x8 -> 64 bits
-_BHASH_EDGE = 16            # 16x16 -> 256 bits
-_PHASH_SCALE = 32            # pHash works on a 32x32 image, keeps the 8x8 low freqs
+BHASH_BITS = 256  # 16x16 block-mean "visual layout" hash
+_HASH_EDGE = 8  # 8x8 -> 64 bits
+_BHASH_EDGE = 16  # 16x16 -> 256 bits
+_PHASH_SCALE = 32  # pHash works on a 32x32 image, keeps the 8x8 low freqs
 
 # cosine lookup tables, built lazily and cached per size
 _cos_tables: dict[int, list[list[float]]] = {}
@@ -33,22 +34,19 @@ _cos_tables: dict[int, list[list[float]]] = {}
 def _cos_table(n: int) -> list[list[float]]:
     table = _cos_tables.get(n)
     if table is None:
-        table = [
-            [math.cos(math.pi / n * (x + 0.5) * k) for x in range(n)]
-            for k in range(n)
-        ]
+        table = [[math.cos(math.pi / n * (x + 0.5) * k) for x in range(n)] for k in range(n)]
         _cos_tables[n] = table
     return table
 
 
-def _open_gray(path: str, size: tuple[int, int]) -> Optional[list[int]]:
+def _open_gray(path: str, size: tuple[int, int]) -> list[int] | None:
     """Return the pixels of *path* reduced to ``size`` grayscale, row-major."""
     try:
         with Image.open(extended_path(path)) as img:
-            img = ImageOps.exif_transpose(img)          # normalise rotation
+            img = ImageOps.exif_transpose(img)  # normalise rotation
             img = img.convert("L").resize(size, Image.LANCZOS)
             return list(img.getdata())
-    except Exception:  # noqa: BLE001 - corrupt / unsupported
+    except Exception:
         return None
 
 
@@ -57,7 +55,7 @@ def _load_gray_master(path: str):
     try:
         with Image.open(extended_path(path)) as img:
             return ImageOps.exif_transpose(img).convert("L")
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -65,11 +63,11 @@ def _gray_master_from_bytes(data: bytes):
     try:
         with Image.open(io.BytesIO(data)) as img:
             return ImageOps.exif_transpose(img).convert("L")
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
-def perceptual_hash_bytes(data: bytes) -> Optional[int]:
+def perceptual_hash_bytes(data: bytes) -> int | None:
     """pHash of an in-memory image (e.g. a video frame piped from ffmpeg)."""
     master = _gray_master_from_bytes(data)
     return _phash_from(master) if master is not None else None
@@ -104,7 +102,7 @@ def _bhash_from(master) -> int:
     return _bits_to_int(v > median for v in px)
 
 
-def bhash(path: str) -> Optional[int]:
+def bhash(path: str) -> int | None:
     master = _load_gray_master(path)
     return _bhash_from(master) if master is not None else None
 
@@ -113,15 +111,11 @@ def _phash_from(master) -> int:
     n, e = _PHASH_SCALE, _HASH_EDGE
     px = list(master.resize((n, n), Image.LANCZOS).getdata())
     cos = _cos_table(n)
-    rows = [px[i * n:(i + 1) * n] for i in range(n)]
+    rows = [px[i * n : (i + 1) * n] for i in range(n)]
     tmp = [
-        [math.fsum(rows[x][y] * cos[u][y] for y in range(n)) for u in range(e)]
-        for x in range(n)
+        [math.fsum(rows[x][y] * cos[u][y] for y in range(n)) for u in range(e)] for x in range(n)
     ]
-    dct = [
-        [math.fsum(tmp[x][u] * cos[v][x] for x in range(n)) for u in range(e)]
-        for v in range(e)
-    ]
+    dct = [[math.fsum(tmp[x][u] * cos[v][x] for x in range(n)) for u in range(e)] for v in range(e)]
     vals = [dct[v][u] for v in range(e) for u in range(e)]
     ordered = sorted(vals)
     mid = len(ordered) // 2
@@ -137,7 +131,7 @@ def _bits_to_int(bits: Iterable[bool]) -> int:
     return value
 
 
-def average_hash(path: str) -> Optional[int]:
+def average_hash(path: str) -> int | None:
     px = _open_gray(path, (_HASH_EDGE, _HASH_EDGE))
     if px is None:
         return None
@@ -145,7 +139,7 @@ def average_hash(path: str) -> Optional[int]:
     return _bits_to_int(p > avg for p in px)
 
 
-def difference_hash(path: str) -> Optional[int]:
+def difference_hash(path: str) -> int | None:
     # 9x8: compare each pixel with its right neighbour -> 8x8 bits
     px = _open_gray(path, (_HASH_EDGE + 1, _HASH_EDGE))
     if px is None:
@@ -159,7 +153,7 @@ def difference_hash(path: str) -> Optional[int]:
     return _bits_to_int(bits)
 
 
-def perceptual_hash(path: str) -> Optional[int]:
+def perceptual_hash(path: str) -> int | None:
     """pHash: 2D DCT of a 32x32 grayscale image, threshold the 8x8 low
     frequencies against their median."""
     px = _open_gray(path, (_PHASH_SCALE, _PHASH_SCALE))
@@ -169,19 +163,15 @@ def perceptual_hash(path: str) -> Optional[int]:
     n = _PHASH_SCALE
     e = _HASH_EDGE
     cos = _cos_table(n)
-    rows = [px[i * n:(i + 1) * n] for i in range(n)]
+    rows = [px[i * n : (i + 1) * n] for i in range(n)]
 
     # separable DCT-II, keeping only the first `e` frequencies per axis
     # tmp[x][u] = sum_y rows[x][y] * cos[u][y]
     tmp = [
-        [math.fsum(rows[x][y] * cos[u][y] for y in range(n)) for u in range(e)]
-        for x in range(n)
+        [math.fsum(rows[x][y] * cos[u][y] for y in range(n)) for u in range(e)] for x in range(n)
     ]
     # dct[v][u] = sum_x tmp[x][u] * cos[v][x]
-    dct = [
-        [math.fsum(tmp[x][u] * cos[v][x] for x in range(n)) for u in range(e)]
-        for v in range(e)
-    ]
+    dct = [[math.fsum(tmp[x][u] * cos[v][x] for x in range(n)) for u in range(e)] for v in range(e)]
 
     vals = [dct[v][u] for v in range(e) for u in range(e)]
     ordered = sorted(vals)
@@ -190,7 +180,7 @@ def perceptual_hash(path: str) -> Optional[int]:
     return _bits_to_int(v > median for v in vals)
 
 
-def all_hashes(path: str) -> tuple[Optional[int], Optional[int], Optional[int]]:
+def all_hashes(path: str) -> tuple[int | None, int | None, int | None]:
     """(phash, dhash, ahash) from a single decode."""
     master = _load_gray_master(path)
     if master is None:
@@ -201,8 +191,10 @@ def all_hashes(path: str) -> tuple[Optional[int], Optional[int], Optional[int]]:
 def hashes_from_gray(master) -> tuple[int, int, int, int]:
     """(phash, dhash, ahash, bhash) from an already-decoded grayscale image."""
     return (
-        _phash_from(master), _dhash_from(master),
-        _ahash_from(master), _bhash_from(master),
+        _phash_from(master),
+        _dhash_from(master),
+        _ahash_from(master),
+        _bhash_from(master),
     )
 
 
@@ -221,7 +213,7 @@ class BKTree:
     __slots__ = ("_root",)
 
     def __init__(self) -> None:
-        self._root: Optional[list] = None  # [key, payloads, {dist: child_node}]
+        self._root: list | None = None  # [key, payloads, {dist: child_node}]
 
     def add(self, key: int, payload) -> None:
         if self._root is None:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import sys
 
 import pytest
 
@@ -49,7 +48,7 @@ def test_unicode_and_spaces(tmp_path):
 
 
 def test_min_size_and_ignored_ext(tmp_path):
-    _touch(tmp_path / "tiny.jpg", b"x")          # 1 byte
+    _touch(tmp_path / "tiny.jpg", b"x")  # 1 byte
     _touch(tmp_path / "big.jpg", b"x" * 5000)
     _touch(tmp_path / "skip.aae", b"x" * 5000)
 

@@ -1,5 +1,6 @@
 """Settings dialog. Phase-1 options are live; later-phase options are shown
 but marked as such so the user knows what to expect."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -158,11 +159,17 @@ class SettingsDialog(QDialog):
         form.addRow("Sensibilidad de detección", self.sensitivity_combo)
 
         bands = self._config.similarity_bands or {}
-        self.band_vi = QSpinBox(); self.band_vi.setRange(50, 100); self.band_vi.setSuffix(" %")
+        self.band_vi = QSpinBox()
+        self.band_vi.setRange(50, 100)
+        self.band_vi.setSuffix(" %")
         self.band_vi.setValue(int(bands.get("visually_identical", 98)))
-        self.band_vs = QSpinBox(); self.band_vs.setRange(50, 100); self.band_vs.setSuffix(" %")
+        self.band_vs = QSpinBox()
+        self.band_vs.setRange(50, 100)
+        self.band_vs.setSuffix(" %")
         self.band_vs.setValue(int(bands.get("very_similar", 90)))
-        self.band_si = QSpinBox(); self.band_si.setRange(50, 100); self.band_si.setSuffix(" %")
+        self.band_si = QSpinBox()
+        self.band_si.setRange(50, 100)
+        self.band_si.setSuffix(" %")
         self.band_si.setValue(int(bands.get("similar", self._config.similarity_threshold)))
         form.addRow("  ⤷ Visualmente idéntico ≥", self.band_vi)
         form.addRow("  ⤷ Muy similar ≥", self.band_vs)
@@ -170,11 +177,17 @@ class SettingsDialog(QDialog):
 
         wts = self._config.similarity_weights or {}
         self.weight_spins: dict = {}
-        for key, label in [("phash", "pHash (estructura)"), ("dhash", "dHash (bordes)"),
-                           ("ahash", "aHash (tono)"), ("color", "histograma de color"),
-                           ("bhash", "composición (bloques)")]:
-            sp = QSpinBox(); sp.setRange(0, 100); sp.setSuffix(" %")
-            sp.setValue(int(round(wts.get(key, 0.2) * 100)))
+        for key, label in [
+            ("phash", "pHash (estructura)"),
+            ("dhash", "dHash (bordes)"),
+            ("ahash", "aHash (tono)"),
+            ("color", "histograma de color"),
+            ("bhash", "composición (bloques)"),
+        ]:
+            sp = QSpinBox()
+            sp.setRange(0, 100)
+            sp.setSuffix(" %")
+            sp.setValue(round(wts.get(key, 0.2) * 100))
             self.weight_spins[key] = sp
             form.addRow(f"  ⤷ peso {label}", sp)
 
@@ -207,24 +220,27 @@ class SettingsDialog(QDialog):
 
     def _sync_custom(self) -> None:
         custom = self.sensitivity_combo.currentData() == "custom"
-        for w in (self.band_vi, self.band_vs, self.band_si, self.crop_check,
-                  *self.weight_spins.values()):
+        for w in (
+            self.band_vi,
+            self.band_vs,
+            self.band_si,
+            self.crop_check,
+            *self.weight_spins.values(),
+        ):
             w.setEnabled(custom)
 
     def _refresh_ai_hint(self) -> None:
         if not self.ai_check.isChecked():
-            self.ai_hint.setText(
-                "Desactivada: se usan solo los métodos tradicionales (rápidos)."
-            )
+            self.ai_hint.setText("Desactivada: se usan solo los métodos tradicionales (rápidos).")
             return
         try:
             from app.core.embeddings import backend_status
 
             self.ai_hint.setText(backend_status())
-        except Exception:  # noqa: BLE001
+        except Exception:
             self.ai_hint.setText(
                 "Sin backend de IA instalado. Instala el extra:  pip install "
-                "\"pixmatch[ai]\"  (open-clip-torch / onnxruntime)."
+                '"pixmatch[ai]"  (open-clip-torch / onnxruntime).'
             )
 
     def _check_ffmpeg(self) -> None:
@@ -242,9 +258,9 @@ class SettingsDialog(QDialog):
     def _exclude_tab(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.addWidget(QLabel(
-            "Marca las carpetas que quieres excluir. Nada se excluye automáticamente."
-        ))
+        layout.addWidget(
+            QLabel("Marca las carpetas que quieres excluir. Nada se excluye automáticamente.")
+        )
         self.exclude_list = QListWidget()
         selected = set(self._config.excluded_dir_names)
         for name in sorted(set(COMMON_EXCLUDES) | selected):
@@ -311,9 +327,7 @@ class SettingsDialog(QDialog):
         }
         c.similarity_threshold = self.band_si.value()
         total_w = sum(sp.value() for sp in self.weight_spins.values()) or 1
-        c.similarity_weights = {
-            k: sp.value() / total_w for k, sp in self.weight_spins.items()
-        }
+        c.similarity_weights = {k: sp.value() / total_w for k, sp in self.weight_spins.items()}
         c.detect_crops = self.crop_check.isChecked()
         c.use_ai_embeddings = self.ai_check.isChecked()
         c.use_cache = self.cache_check.isChecked()

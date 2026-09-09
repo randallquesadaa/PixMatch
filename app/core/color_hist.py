@@ -8,9 +8,8 @@ being called duplicates.
 
 Stored as 64 comma-separated integers (0..1000, sums to ~1000). Pure Pillow.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from PIL import Image, ImageOps
 
@@ -24,13 +23,16 @@ _SCALE = 1000
 
 
 def signature_from_image(img: Image.Image) -> str:
-    hsv = ImageOps.exif_transpose(img).convert("RGB").resize(
-        (_THUMB, _THUMB), Image.LANCZOS
-    ).convert("HSV")
+    hsv = (
+        ImageOps.exif_transpose(img)
+        .convert("RGB")
+        .resize((_THUMB, _THUMB), Image.LANCZOS)
+        .convert("HSV")
+    )
     counts = [0] * BINS
     total = 0
     for h, s, v in hsv.getdata():
-        if v < 12:                       # near-black: hue is meaningless
+        if v < 12:  # near-black: hue is meaningless
             continue
         hb = (h * _H_BINS) // 256
         sb = (s * _S_BINS) // 256
@@ -42,11 +44,11 @@ def signature_from_image(img: Image.Image) -> str:
     return ",".join(str(x) for x in norm)
 
 
-def color_signature(path: str) -> Optional[str]:
+def color_signature(path: str) -> str | None:
     try:
         with Image.open(extended_path(path)) as img:
             return signature_from_image(img)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -57,7 +59,7 @@ def _parse(sig: str) -> list[int]:
         return []
 
 
-def histogram_similarity(sig_a: Optional[str], sig_b: Optional[str]) -> Optional[float]:
+def histogram_similarity(sig_a: str | None, sig_b: str | None) -> float | None:
     """Histogram intersection, 0..100. ``None`` if either signature is missing
     or empty."""
     a, b = _parse(sig_a or ""), _parse(sig_b or "")

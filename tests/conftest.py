@@ -1,9 +1,9 @@
 """Shared fixtures. All test data is generated into pytest's tmp_path and is
 therefore temporary and isolated."""
+
 from __future__ import annotations
 
 import io
-import os
 from pathlib import Path
 
 import pytest
@@ -60,11 +60,29 @@ def make_video(ffmpeg_tools):
         path.parent.mkdir(parents=True, exist_ok=True)
         src = f"{pattern}=duration={duration}:size={size[0]}x{size[1]}:rate={rate}"
         cmd = [
-            ffmpeg_tools.ffmpeg, "-nostdin", "-y", "-loglevel", "error",
-            "-f", "lavfi", "-i", src,
-            "-f", "lavfi", "-i", f"sine=frequency=440:duration={duration}",
-            "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", str(crf),
-            "-c:a", "aac", "-shortest", str(path),
+            ffmpeg_tools.ffmpeg,
+            "-nostdin",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            src,
+            "-f",
+            "lavfi",
+            "-i",
+            f"sine=frequency=440:duration={duration}",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "libx264",
+            "-crf",
+            str(crf),
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(path),
         ]
         subprocess.run(cmd, check=True, capture_output=True, timeout=60)
         return path

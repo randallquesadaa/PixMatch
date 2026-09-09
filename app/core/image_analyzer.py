@@ -13,11 +13,11 @@ To compare pixels we normalise:
 grouping is a cheap dictionary lookup instead of an O(n^2) pairwise decode.
 The full-resolution image is opened once and released immediately.
 """
+
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Optional
 
 from PIL import Image, ImageChops, ImageOps
 
@@ -41,7 +41,7 @@ def _normalised(img: Image.Image) -> Image.Image:
     return img
 
 
-def pixel_digest(path: str) -> Optional[tuple[str, DecodedInfo]]:
+def pixel_digest(path: str) -> tuple[str, DecodedInfo] | None:
     """SHA-256 of the normalised pixels, plus basic decoded info.
 
     Returns ``None`` if the image cannot be decoded.
@@ -55,7 +55,7 @@ def pixel_digest(path: str) -> Optional[tuple[str, DecodedInfo]]:
             digest.update(norm.tobytes())
             info = DecodedInfo(norm.width, norm.height, original_mode)
             return digest.hexdigest(), info
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.debug("pixel_digest failed for %s: %s", path, exc)
         return None
 
@@ -71,7 +71,7 @@ def pixels_equal(path_a: str, path_b: str) -> bool:
             # Pillow >= 10 defaults getbbox() to alpha-only for RGBA images;
             # force it to look at every band.
             return ImageChops.difference(na, nb).getbbox(alpha_only=False) is None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.debug("pixels_equal failed for %s / %s: %s", path_a, path_b, exc)
         return False
 
@@ -82,7 +82,7 @@ def difference_image(
     *,
     amplify: bool = True,
     max_edge: int = 1400,
-) -> Optional[Image.Image]:
+) -> Image.Image | None:
     """An RGB image highlighting where A and B differ (B is resized to A).
 
     For the "Comparación avanzada" view. Returns ``None`` on failure.
@@ -100,6 +100,6 @@ def difference_image(
             if amplify:
                 diff = ImageOps.autocontrast(diff, cutoff=0)
             return diff
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.debug("difference_image failed: %s", exc)
         return None

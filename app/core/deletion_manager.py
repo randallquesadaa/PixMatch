@@ -11,13 +11,14 @@ Design rules (non-negotiable):
   * The caller decides whether a group may be left with zero copies; this
     module only *flags* it.
 """
+
 from __future__ import annotations
 
 import os
 import stat as stat_module
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Iterable, Optional
 
 from app.core.duplicate_groups import DuplicateGroup, FileRecord
 from app.database.history import OperationEntry, OperationHistory
@@ -67,7 +68,7 @@ class DeletionOutcome:
     action: str
     ok: bool
     freed_bytes: int
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -102,10 +103,7 @@ def build_preview(groups: Iterable[DuplicateGroup]) -> DeletionPreview:
         marked = [r for r in group.marked_for_deletion if not r.deleted]
         if not marked:
             continue
-        survivors = [
-            r for r in group.records
-            if not r.deleted and r.decision.value != "delete"
-        ]
+        survivors = [r for r in group.records if not r.deleted and r.decision.value != "delete"]
         if not survivors:
             empty.append(group.group_id)
 
@@ -117,9 +115,7 @@ def build_preview(groups: Iterable[DuplicateGroup]) -> DeletionPreview:
     return DeletionPreview(items, warnings, total, empty)
 
 
-def build_preview_for(
-    pairs: list[tuple], target: Optional[FileRecord] = None
-) -> DeletionPreview:
+def build_preview_for(pairs: list[tuple], target: FileRecord | None = None) -> DeletionPreview:
     """Preview for an explicit list of ``(record, group)`` pairs (used for the
     single-file "Eliminar" action on a card / in the viewer)."""
     from collections import defaultdict
@@ -146,7 +142,8 @@ def build_preview_for(
     for gid, ids in to_delete.items():
         group = group_by_id[gid]
         survivors = [
-            r for r in group.records
+            r
+            for r in group.records
             if not r.deleted and id(r) not in ids and r.decision.value != "delete"
         ]
         if not survivors:
@@ -168,17 +165,19 @@ def _preflight(rec: FileRecord) -> list[DeletionWarning]:
         return [DeletionWarning(rec.path, "Es un enlace simbólico; se moverá solo el enlace.")]
     try:
         if os.path.getsize(extended_path(rec.path)) != rec.size:
-            return [DeletionWarning(
-                rec.path,
-                "El tamaño cambió desde el análisis; se omitirá por seguridad.",
-            )]
+            return [
+                DeletionWarning(
+                    rec.path,
+                    "El tamaño cambió desde el análisis; se omitirá por seguridad.",
+                )
+            ]
     except OSError as exc:
         return [DeletionWarning(rec.path, f"No accesible ({exc}); se omitirá.")]
     return []
 
 
 class DeletionManager:
-    def __init__(self, history: Optional[OperationHistory] = None) -> None:
+    def __init__(self, history: OperationHistory | None = None) -> None:
         self.history = history or OperationHistory()
 
     # ------------------------------------------------------------------
@@ -187,8 +186,8 @@ class DeletionManager:
         planned: list[PlannedDeletion],
         *,
         mode: DeletionMode,
-        progress: Optional[Callable[[int, int, str], None]] = None,
-        check: Optional[Callable[[], bool]] = None,
+        progress: Callable[[int, int, str], None] | None = None,
+        check: Callable[[], bool] | None = None,
     ) -> DeletionReport:
         outcomes: list[DeletionOutcome] = []
         entries: list[OperationEntry] = []
@@ -203,15 +202,17 @@ class DeletionManager:
             rec = item.record
             outcome = self._delete_one(rec, mode)
             outcomes.append(outcome)
-            entries.append(OperationEntry.now(
-                path=rec.path,
-                action=mode.value,
-                result="ok" if outcome.ok else "error",
-                detail=outcome.error,
-                size=rec.size,
-                group_id=item.group_id,
-                category=item.category,
-            ))
+            entries.append(
+                OperationEntry.now(
+                    path=rec.path,
+                    action=mode.value,
+                    result="ok" if outcome.ok else "error",
+                    detail=outcome.error,
+                    size=rec.size,
+                    group_id=item.group_id,
+                    category=item.category,
+                )
+            )
             if outcome.ok:
                 rec.deleted = True
 
@@ -241,7 +242,10 @@ class DeletionManager:
             try:
                 if os.path.getsize(real) != rec.size:
                     return DeletionOutcome(
-                        path, mode.value, False, 0,
+                        path,
+                        mode.value,
+                        False,
+                        0,
                         "El archivo cambió desde el análisis; se omite por seguridad.",
                     )
             except OSError as exc:
@@ -252,7 +256,7 @@ class DeletionManager:
                 _send_to_trash(path)
             else:
                 os.remove(real)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("Delete failed (%s): %s -> %s", mode.value, path, exc)
             return DeletionOutcome(path, mode.value, False, 0, str(exc))
 

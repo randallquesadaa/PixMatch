@@ -222,6 +222,36 @@ dependa del idioma. Sin `gettext`/`.po` para no añadir toolchain de compilació
 
 ---
 
+## Integración continua y releases
+
+Workflows en `.github/workflows/`:
+
+| Workflow | Cuándo | Qué hace |
+|---|---|---|
+| `ci.yml` | cada PR; llamado por `release.yml` | `ruff check` + `ruff format --check`; `bandit` (media+) + `pip-audit`; `pytest` con cobertura en Linux/macOS/Windows × Python 3.11-3.13 (con FFmpeg real). Un job `ci-ok` agrega el resultado → es el *required check* para fusionar. |
+| `codeql.yml` | push/PR a `main` + semanal | CodeQL Python, consultas `security-and-quality`. |
+| `dependency-review.yml` | cada PR | bloquea PRs que introducen CVEs altas o licencias GPL/AGPL. |
+| `release.yml` | push a `main` | reejecuta toda la CI; si pasa **y** `app/__init__.py::__version__` no tiene aún un tag `vX.Y.Z`, crea el tag sobre ese commit, compila con PyInstaller en las 3 plataformas y publica un GitHub Release con los archivos + `SHA256SUMS.txt`. |
+
+Decisiones:
+
+- **Disparador de release = cambio de versión, no cada commit.** `main` recibe
+  muchos merges; solo los que suben `__version__` publican. Evita releases
+  ruidosas y da un control explícito con un diff de una línea.
+- **La CI se define una vez.** `ci.yml` tiene `workflow_call`; `release.yml` la
+  reutiliza con `uses:` en lugar de duplicar los jobs. `ci.yml` **no** se
+  dispara en push a `main` (lo hace `release.yml`), así no hay doble ejecución.
+- **Sin acciones de terceros para publicar.** El release se crea con el `gh`
+  CLI (preinstalado) y `GITHUB_TOKEN`; las únicas acciones externas son las
+  oficiales de GitHub (`checkout`, `setup-python`, `upload/download-artifact`,
+  `codeql-action`, `dependency-review-action`).
+- **Binarios MIT-limpios.** El job de release **no** instala `imageio-ffmpeg`
+  (su FFmpeg es GPL). Los `build_*.sh` locales sí lo instalan.
+- **`gh` con `--target $SHA`** crea el tag anotado en el commit exacto que pasó
+  la CI, no en el estado de `main` en el momento del build.
+
+---
+
 ## Límites de escala y rendimiento
 
 Benchmark: `N=3000 python scripts/benchmark.py`. En el equipo de desarrollo
@@ -256,9 +286,10 @@ Extrapolación lineal: 100 000 imágenes ≈ 2 min (exacto) / ≈ 5 min
 - **`FileCacheDB.prune_missing()`** existe pero `run_analysis` no la llama
   automáticamente (riesgo si el *root* analizado es una subcarpeta). Falta
   decidir la política o exponer un "limpiar caché".
-- **Empaquetado Windows/macOS.** Los scripts están listos y el build de Linux
-  probado; el build real en Windows/macOS hay que ejecutarlo en su plataforma
-  (no hay cross-compilación).
+- **Empaquetado.** GitHub Actions compila las tres plataformas en cada release
+  (nativo, no cross-compilación). macOS solo se compila para Apple Silicon
+  (`arm64`); falta un runner Intel si se quiere `x86_64`. Los binarios van sin
+  firmar (no hay certificados de Apple/Microsoft).
 
 ---
 
@@ -270,3 +301,8 @@ Extrapolación lineal: 100 000 imágenes ≈ 2 min (exacto) / ≈ 5 min
 - Export que combine el estado actual + el historial de operaciones.
 - i18n completo + más idiomas.
 - Recorte proporcional (mismo aspecto) además del recorte con cambio de aspecto.
+- Firmar/notarizar los binarios (certificados de Apple y de firma de código de
+  Windows) para quitar los avisos de "app sin identificar".
+- Runner de macOS Intel para publicar también `x86_64`; AppImage/`.deb` para
+  Linux; publicar en PyPI.
+- `--cov-fail-under` y subir la cobertura a un servicio (hoy es informativa).

@@ -1,5 +1,6 @@
 """Safe-deletion tests. Trash mode is exercised with a fake trash directory so
 the real recycle bin is never touched."""
+
 from __future__ import annotations
 
 import os
@@ -87,7 +88,7 @@ def test_trash_mode_moves_not_deletes(tmp_path, fake_trash):
     )
     assert report.succeeded
     assert not b.exists()
-    assert (trash / "dup.jpg").exists()   # recoverable
+    assert (trash / "dup.jpg").exists()  # recoverable
     assert moved == [str(trash / "dup.jpg")]
 
 
@@ -160,7 +161,7 @@ def test_cancel_stops_batch(tmp_path):
 
     def check():
         calls["n"] += 1
-        return calls["n"] <= 3   # allow 3, then cancel
+        return calls["n"] <= 3  # allow 3, then cancel
 
     report = DeletionManager(_history(tmp_path)).delete(
         recs, mode=DeletionMode.PERMANENT, check=check

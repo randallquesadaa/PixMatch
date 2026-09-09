@@ -1,8 +1,8 @@
 """Row types for the analysis cache."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 SCHEMA_VERSION = 3
 
@@ -50,13 +50,35 @@ CREATE INDEX IF NOT EXISTS ix_file_cache_pixel  ON file_cache(pixel_digest);
 """
 
 _FIELDS = (
-    "path", "size", "mtime", "sha256", "pixel_digest",
-    "phash", "dhash", "ahash", "bhash", "color_sig", "embedding",
-    "width", "height", "img_format", "color_mode",
-    "orientation", "has_exif", "camera_make", "camera_model", "date_taken",
+    "path",
+    "size",
+    "mtime",
+    "sha256",
+    "pixel_digest",
+    "phash",
+    "dhash",
+    "ahash",
+    "bhash",
+    "color_sig",
+    "embedding",
+    "width",
+    "height",
+    "img_format",
+    "color_mode",
+    "orientation",
+    "has_exif",
+    "camera_make",
+    "camera_model",
+    "date_taken",
     "decode_error",
-    "video_duration", "video_width", "video_height", "video_codec",
-    "video_fps", "video_bitrate", "video_audio", "frame_hashes",
+    "video_duration",
+    "video_width",
+    "video_height",
+    "video_codec",
+    "video_fps",
+    "video_bitrate",
+    "video_audio",
+    "frame_hashes",
     "analyzed_at",
 )
 
@@ -66,32 +88,32 @@ class CachedFile:
     path: str
     size: int
     mtime: float
-    sha256: Optional[str] = None
-    pixel_digest: Optional[str] = None
-    phash: Optional[str] = None
-    dhash: Optional[str] = None
-    ahash: Optional[str] = None
-    bhash: Optional[str] = None
-    color_sig: Optional[str] = None
-    embedding: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    img_format: Optional[str] = None
-    color_mode: Optional[str] = None
-    orientation: Optional[int] = None
-    has_exif: Optional[int] = None
-    camera_make: Optional[str] = None
-    camera_model: Optional[str] = None
-    date_taken: Optional[str] = None
-    decode_error: Optional[str] = None
-    video_duration: Optional[float] = None
-    video_width: Optional[int] = None
-    video_height: Optional[int] = None
-    video_codec: Optional[str] = None
-    video_fps: Optional[float] = None
-    video_bitrate: Optional[int] = None
-    video_audio: Optional[str] = None
-    frame_hashes: Optional[str] = None
+    sha256: str | None = None
+    pixel_digest: str | None = None
+    phash: str | None = None
+    dhash: str | None = None
+    ahash: str | None = None
+    bhash: str | None = None
+    color_sig: str | None = None
+    embedding: str | None = None
+    width: int | None = None
+    height: int | None = None
+    img_format: str | None = None
+    color_mode: str | None = None
+    orientation: int | None = None
+    has_exif: int | None = None
+    camera_make: str | None = None
+    camera_model: str | None = None
+    date_taken: str | None = None
+    decode_error: str | None = None
+    video_duration: float | None = None
+    video_width: int | None = None
+    video_height: int | None = None
+    video_codec: str | None = None
+    video_fps: float | None = None
+    video_bitrate: int | None = None
+    video_audio: str | None = None
+    frame_hashes: str | None = None
     analyzed_at: float = 0.0
 
     def is_valid_for(self, size: int, mtime: float, *, mtime_tol: float = 1e-3) -> bool:

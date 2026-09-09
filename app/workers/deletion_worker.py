@@ -5,6 +5,7 @@ batch must not freeze the UI) and is cooperatively cancellable. The runner
 object itself stays on the GUI thread; Qt signals emitted from the worker
 thread are delivered to GUI slots via queued connections.
 """
+
 from __future__ import annotations
 
 import threading
@@ -25,8 +26,8 @@ log = get_logger(__name__)
 
 
 class DeletionRunner(QObject):
-    progress = Signal(int, int, str)      # done, total, current path
-    finished = Signal(object)             # DeletionReport
+    progress = Signal(int, int, str)  # done, total, current path
+    finished = Signal(object)  # DeletionReport
     failed = Signal(str)
 
     def __init__(
@@ -67,7 +68,7 @@ class DeletionRunner(QObject):
                 check=self.controller.checkpoint,
             )
             self.finished.emit(report)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("Deletion crashed")
             self.failed.emit(str(exc))
         finally:

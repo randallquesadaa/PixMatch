@@ -1,0 +1,24 @@
+name: Dependency review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Requires the repository's "Dependency graph" feature (Settings -> Security).
+    # Enabled together with Dependabot on this repo.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review dependency changes for known vulnerabilities & licenses
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # Strong copyleft would compromise the MIT distribution of the binaries.
+          # (LGPL is allowed: PySide6/Qt is LGPL and dynamically linked - see README.)
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
+          comment-summary-in-pr: on-failure

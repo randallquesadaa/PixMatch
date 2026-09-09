@@ -13,10 +13,10 @@ weighted average is the reported score. The weights are configurable
 The engine also returns human-readable *reasons* ("por qué se agruparon") and,
 where relevant, an *upgraded category* (RESIZED_DUPLICATE / CROPPED_SIMILAR).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.core.color_hist import histogram_similarity
 from app.core.perceptual import BHASH_BITS, HASH_BITS, hamming, similarity_percent
@@ -50,16 +50,17 @@ _REASON_TEXT = {
 @dataclass
 class Signals:
     """The per-file signatures the engine needs (a thin view over FileRecord)."""
-    phash: Optional[int] = None
-    dhash: Optional[int] = None
-    ahash: Optional[int] = None
-    bhash: Optional[int] = None
-    color_sig: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
+
+    phash: int | None = None
+    dhash: int | None = None
+    ahash: int | None = None
+    bhash: int | None = None
+    color_sig: str | None = None
+    width: int | None = None
+    height: int | None = None
 
     @property
-    def aspect(self) -> Optional[float]:
+    def aspect(self) -> float | None:
         if self.width and self.height:
             return self.width / self.height
         return None
@@ -67,13 +68,13 @@ class Signals:
 
 @dataclass
 class ScoreResult:
-    score: float                       # 0..100 combined
+    score: float  # 0..100 combined
     per_signal: dict[str, float] = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
-    upgrade: Optional[MatchCategory] = None   # RESIZED_DUPLICATE / CROPPED_SIMILAR
+    upgrade: MatchCategory | None = None  # RESIZED_DUPLICATE / CROPPED_SIMILAR
 
 
-def _norm_weights(weights: Optional[dict[str, float]]) -> dict[str, float]:
+def _norm_weights(weights: dict[str, float] | None) -> dict[str, float]:
     w = dict(DEFAULT_WEIGHTS)
     if weights:
         for k in w:
@@ -83,7 +84,7 @@ def _norm_weights(weights: Optional[dict[str, float]]) -> dict[str, float]:
     return {k: v / total for k, v in w.items()}
 
 
-def _aspect_close(a: Optional[float], b: Optional[float], tol: float = 0.04) -> bool:
+def _aspect_close(a: float | None, b: float | None, tol: float = 0.04) -> bool:
     if not a or not b:
         return False
     return abs(a - b) <= tol * max(a, b)
@@ -93,7 +94,7 @@ def combined_score(
     a: Signals,
     b: Signals,
     *,
-    weights: Optional[dict[str, float]] = None,
+    weights: dict[str, float] | None = None,
     detect_resized: bool = True,
 ) -> ScoreResult:
     w = _norm_weights(weights)
@@ -139,7 +140,8 @@ def combined_score(
         detect_resized
         and score >= 96.0
         and _aspect_close(a.aspect, b.aspect)
-        and a.width and b.width
+        and a.width
+        and b.width
         and abs(a.width - b.width) / max(a.width, b.width) >= 0.10
     ):
         result.upgrade = MatchCategory.RESIZED_DUPLICATE
@@ -152,7 +154,7 @@ def combined_score(
     return result
 
 
-def classify_combined(score: float, bands: "SimilarityBands") -> MatchCategory:
+def classify_combined(score: float, bands: SimilarityBands) -> MatchCategory:
     """Map a combined score to the base 'similar' family category."""
     if score >= bands.visually_identical:
         return MatchCategory.VISUALLY_IDENTICAL
@@ -169,14 +171,14 @@ class SimilarityBands:
     very_similar: float = 90.0
     similar: float = 75.0
 
-    def clamped(self) -> "SimilarityBands":
+    def clamped(self) -> SimilarityBands:
         vi = min(100.0, max(1.0, self.visually_identical))
         vs = min(vi, max(1.0, self.very_similar))
         si = min(vs, max(1.0, self.similar))
         return SimilarityBands(vi, vs, si)
 
     @classmethod
-    def from_config(cls, config) -> "SimilarityBands":
+    def from_config(cls, config) -> SimilarityBands:
         return resolve_bands(config)
 
 

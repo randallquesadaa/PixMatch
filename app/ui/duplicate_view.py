@@ -1,11 +1,11 @@
 """The duplicate browser: filter / sort / search on the left, one group shown
 in detail on the right, with side-by-side comparison and per-file decisions."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -29,12 +29,26 @@ from app.ui.widgets.file_card import FileCard
 from app.utils.file_utils import human_size
 
 _FILTERS = [
-    "Todas", "Imágenes", "Videos",
-    "Archivo idéntico", "Pixel idéntico", "Redimensionados", "Recortes", "Similares",
-    "Sin revisar", "Revisados", "Marcados para eliminar", "Resueltos",
+    "Todas",
+    "Imágenes",
+    "Videos",
+    "Archivo idéntico",
+    "Pixel idéntico",
+    "Redimensionados",
+    "Recortes",
+    "Similares",
+    "Sin revisar",
+    "Revisados",
+    "Marcados para eliminar",
+    "Resueltos",
 ]
 _SORTS = [
-    "Ahorro potencial", "Nº de duplicados", "Tamaño", "Similitud", "Nombre", "Ruta",
+    "Ahorro potencial",
+    "Nº de duplicados",
+    "Tamaño",
+    "Similitud",
+    "Nombre",
+    "Ruta",
 ]
 
 _SIMILAR_CATEGORIES = (
@@ -49,8 +63,8 @@ _SIMILAR_CATEGORIES = (
 
 class DuplicateView(QWidget):
     decisions_changed = Signal()
-    deletion_requested = Signal()          # delete everything marked
-    single_deletion_requested = Signal(object)   # FileRecord - delete just this one
+    deletion_requested = Signal()  # delete everything marked
+    single_deletion_requested = Signal(object)  # FileRecord - delete just this one
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -76,7 +90,9 @@ class DuplicateView(QWidget):
         self.min_count.setSuffix(" archivos")
 
         for w in (self.filter_combo, self.sort_combo, self.min_count):
-            w.currentIndexChanged.connect(self._rebuild) if isinstance(w, QComboBox) else w.valueChanged.connect(self._rebuild)
+            w.currentIndexChanged.connect(self._rebuild) if isinstance(
+                w, QComboBox
+            ) else w.valueChanged.connect(self._rebuild)
         self.search_edit.textChanged.connect(self._rebuild)
 
         self.group_list = QListWidget()
@@ -117,7 +133,9 @@ class DuplicateView(QWidget):
         self.ignore_btn = QPushButton(tr("Ignorar grupo"))
         self.clear_btn = QPushButton(tr("Quitar decisiones"))
         self.advanced_btn = QPushButton(tr("🔍 Comparar en detalle"))
-        self.keep_sel_btn.setToolTip("Conservar los archivos marcados y marcar el resto para eliminar")
+        self.keep_sel_btn.setToolTip(
+            "Conservar los archivos marcados y marcar el resto para eliminar"
+        )
         self.del_unsel_btn.setToolTip("Marcar para eliminar todo lo que NO esté seleccionado")
         self.ignore_btn.setToolTip("Sacar este grupo de la revisión sin borrar nada")
         self.keep_sel_btn.clicked.connect(self.keep_selected)
@@ -128,8 +146,11 @@ class DuplicateView(QWidget):
         self.advanced_btn.clicked.connect(self.open_advanced_compare)
 
         self._group_action_buttons = [
-            self.keep_sel_btn, self.del_unsel_btn, self.keep_all_btn,
-            self.ignore_btn, self.clear_btn,
+            self.keep_sel_btn,
+            self.del_unsel_btn,
+            self.keep_all_btn,
+            self.ignore_btn,
+            self.clear_btn,
         ]
         actions = QHBoxLayout()
         for b in (*self._group_action_buttons, self.advanced_btn):
@@ -196,8 +217,11 @@ class DuplicateView(QWidget):
             self.marked_summary.setText(tr("Nada marcado para eliminar."))
             return
         marked = [
-            r for g in self._result.groups if not g.ignored
-            for r in g.marked_for_deletion if not r.deleted
+            r
+            for g in self._result.groups
+            if not g.ignored
+            for r in g.marked_for_deletion
+            if not r.deleted
         ]
         freed = sum(r.size for r in marked)
         self.delete_marked_btn.setEnabled(bool(marked))
@@ -255,10 +279,7 @@ class DuplicateView(QWidget):
         def matches_query(g: DuplicateGroup) -> bool:
             if not query:
                 return True
-            for r in g.records:
-                if query in r.name.lower() or query in r.path.lower():
-                    return True
-            return False
+            return any(query in r.name.lower() or query in r.path.lower() for r in g.records)
 
         groups = [g for g in groups if matches_filter(g) and matches_query(g)]
 
@@ -326,9 +347,7 @@ class DuplicateView(QWidget):
         deleted_note = ""
         if group.deleted_records:
             deleted_note = f"  ·  {len(group.deleted_records)} ya eliminado(s)"
-        self.header.setText(
-            f"Grupo #{group.group_id} — {group.count} {noun}{sim}{deleted_note}"
-        )
+        self.header.setText(f"Grupo #{group.group_id} — {group.count} {noun}{sim}{deleted_note}")
         self.badge.setText(f"{style.emoji} {style.short_es}")
         self.badge.setStyleSheet(f"#Badge {{ background: {style.color}; }}")
 
@@ -342,12 +361,11 @@ class DuplicateView(QWidget):
                 "para ver las diferencias antes de decidir."
             )
         # per-member relation ("small → 98.7%")
-        members_by_sim = sorted(
-            group.records, key=lambda r: -(r.similarity_percent or 0)
-        )
+        members_by_sim = sorted(group.records, key=lambda r: -(r.similarity_percent or 0))
         rel = " · ".join(
             f"{r.name} {r.similarity_percent:.1f}%"
-            for r in members_by_sim if r.similarity_percent is not None
+            for r in members_by_sim
+            if r.similarity_percent is not None
         )
         if rel and not group.is_exact:
             parts.append(f"<b>Relación:</b> {rel}")
@@ -363,9 +381,7 @@ class DuplicateView(QWidget):
         self.advanced_btn.setText(
             tr("🎬 Comparar vídeos") if is_video_group else tr("🔍 Comparar en detalle")
         )
-        self.advanced_btn.setVisible(
-            group.count >= 2 and (not group.is_exact or is_video_group)
-        )
+        self.advanced_btn.setVisible(group.count >= 2 and (not group.is_exact or is_video_group))
 
         # rebuild cards
         while self.cards_layout.count():
@@ -396,9 +412,9 @@ class DuplicateView(QWidget):
         active = [c for c in cards if not c.record.deleted]
         has_group = bool(self._visible) and len(active) >= 1
         checked = [c for c in active if c.keep_checkbox.isChecked()]
-        any_decision = any(
-            c.record.decision.value != "undecided" for c in active
-        ) or (self._visible and self._current_group().ignored)
+        any_decision = any(c.record.decision.value != "undecided" for c in active) or (
+            self._visible and self._current_group().ignored
+        )
 
         # "keep selected" / "delete unselected" only make sense with a partial
         # selection (all-checked is just "keep all", none-checked is a no-op)
@@ -452,16 +468,15 @@ class DuplicateView(QWidget):
         )
         if g.has_unsafe_decision:
             self.savings.setText(
-                self.savings.text()
-                + "   ⚠️ Todos están marcados para eliminar: quedaría 0 copias."
+                self.savings.text() + "   ⚠️ Todos están marcados para eliminar: quedaría 0 copias."
             )
 
     def keep_selected(self) -> None:
-        g = self._current_group()
         any_selected = any(c.keep_checkbox.isChecked() for c in self._cards)
         if not any_selected:
             QMessageBox.information(
-                self, "Nada seleccionado",
+                self,
+                "Nada seleccionado",
                 "Marca al menos un archivo con «Mantener este archivo».",
             )
             return
@@ -533,7 +548,8 @@ class DuplicateView(QWidget):
         images = [r for r in group.records if r.kind is FileKind.IMAGE]
         if len(images) < 2:
             QMessageBox.information(
-                self, "Comparación avanzada",
+                self,
+                "Comparación avanzada",
                 "Se necesitan al menos dos elementos comparables en el grupo.",
             )
             return

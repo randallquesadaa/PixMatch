@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from app.core.ffmpeg import FfmpegTools, detect, install_hint
 
 
@@ -31,13 +33,14 @@ def test_configured_file_path_is_used(ffmpeg_tools):
     assert tools.source == "config"
 
 
-def test_configured_directory_is_resolved(tmp_path, ffmpeg_tools):
-    import shutil
-
-    directory = tmp_path / "bin"
-    directory.mkdir()
-    linked = directory / "ffmpeg"
-    shutil.copy2(ffmpeg_tools.ffmpeg, linked)
-    tools = detect(configured_ffmpeg=str(directory))
+def test_configured_directory_is_resolved(ffmpeg_tools):
+    # given a directory, detect() must find the ffmpeg executable inside it.
+    # Use the real ffmpeg's own directory: copying the binary elsewhere breaks
+    # relocatable launchers (e.g. the Chocolatey shim on the Windows runner).
+    directory, name = os.path.split(ffmpeg_tools.ffmpeg)
+    if name not in ("ffmpeg", "ffmpeg.exe"):
+        pytest.skip(f"detected ffmpeg has a non-standard filename ({name!r})")
+    tools = detect(configured_ffmpeg=directory)
     assert tools.available
-    assert os.path.dirname(tools.ffmpeg) == str(directory)
+    assert tools.source == "config"
+    assert os.path.dirname(tools.ffmpeg) == directory

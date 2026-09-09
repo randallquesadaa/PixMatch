@@ -16,24 +16,53 @@ For a byte-identical group every copy has the same content, so the score is
 really about *where* to keep it - the confidence is reported lower unless
 there is a clear signal (an obvious copy name, a backup folder).
 """
+
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.core.duplicate_groups import DuplicateGroup, FileRecord
 from app.core.similarity import MatchCategory
 
 _COPY_HINTS = (
-    "copy", "copia", "copie", "kopie", "- copy", "(1)", "(2)", "(3)",
-    "-copy", "_copy", " copy", "duplicate", "duplicado", "dup",
-    " - copia", "conflicted", "conflicto",
+    "copy",
+    "copia",
+    "copie",
+    "kopie",
+    "- copy",
+    "(1)",
+    "(2)",
+    "(3)",
+    "-copy",
+    "_copy",
+    " copy",
+    "duplicate",
+    "duplicado",
+    "dup",
+    " - copia",
+    "conflicted",
+    "conflicto",
 )
 _BAD_DIR_HINTS = (
-    "backup", "back up", "respaldo", "copia de seguridad", "papelera",
-    "trash", ".trash", "recycle", "$recycle", "tmp", "temp", "temporal",
-    "cache", ".cache", "downloads", "descargas", "whatsapp", "telegram",
+    "backup",
+    "back up",
+    "respaldo",
+    "copia de seguridad",
+    "papelera",
+    "trash",
+    ".trash",
+    "recycle",
+    "$recycle",
+    "tmp",
+    "temp",
+    "temporal",
+    "cache",
+    ".cache",
+    "downloads",
+    "descargas",
+    "whatsapp",
+    "telegram",
 )
 _LOSSLESS = {"PNG", "BMP", "TIFF", "TIF", "WEBP-LOSSLESS", "GIF"}
 _LOSSY = {"JPEG", "JPG", "WEBP", "HEIC", "HEIF", "AVIF"}
@@ -42,9 +71,9 @@ _LOSSY = {"JPEG", "JPG", "WEBP", "HEIC", "HEIF", "AVIF"}
 @dataclass
 class Recommendation:
     record: FileRecord
-    confidence: int              # 0-100
+    confidence: int  # 0-100
     reasons: list[str]
-    scores: dict = field(default_factory=dict)   # id(record) -> score (debug/UI)
+    scores: dict = field(default_factory=dict)  # id(record) -> score (debug/UI)
 
 
 def _pixels(rec: FileRecord) -> int:
@@ -100,7 +129,7 @@ def _in_bad_folder(path: str) -> bool:
     return any(hint in parent for hint in _BAD_DIR_HINTS)
 
 
-def recommend_keep(group: DuplicateGroup) -> Optional[Recommendation]:
+def recommend_keep(group: DuplicateGroup) -> Recommendation | None:
     records = group.active_records
     if len(records) < 2:
         return None

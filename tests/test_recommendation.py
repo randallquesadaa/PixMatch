@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from app.core.duplicate_groups import DuplicateGroup, FileRecord
 from app.core.recommendation import recommend_keep
 from app.core.scanner import FileKind
@@ -51,10 +49,13 @@ def test_penalises_copy_name_and_backup_folder(tmp_path):
     (tmp_path / "Fotos").mkdir()
     (tmp_path / "Backup").mkdir()
     original = _rec(str(tmp_path / "Fotos" / "IMG_1234.jpg"), size=1000, mtime=100.0, w=100, h=100)
-    copy = _rec(str(tmp_path / "Backup" / "IMG_1234 - copia.jpg"), size=1000, mtime=200.0, w=100, h=100)
+    copy = _rec(
+        str(tmp_path / "Backup" / "IMG_1234 - copia.jpg"), size=1000, mtime=200.0, w=100, h=100
+    )
     r = recommend_keep(_group([original, copy], MatchCategory.FILE_IDENTICAL))
     assert r.record is original
-    assert any("copia" in x or "backup" in x for x in r.reasons)
+    # the "copy" name + "Backup" folder must have pushed that record's score down
+    assert r.scores[id(copy)] < r.scores[id(original)]
 
 
 def test_exact_group_without_signal_has_low_confidence(tmp_path):

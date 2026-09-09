@@ -5,6 +5,7 @@ frequently. That call blocks while the run is paused and returns ``False``
 once the run has been cancelled, so callers can stop cleanly without any
 forced thread termination.
 """
+
 from __future__ import annotations
 
 import threading

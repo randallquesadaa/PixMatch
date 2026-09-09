@@ -13,13 +13,14 @@ most one** group:
 The user's decision is stored *only in memory*. Nothing is ever deleted,
 moved or renamed here - marking a file "for deletion" only records intent.
 """
+
 from __future__ import annotations
 
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Optional
 
 from app.core.metadata import ImageInfo, read_image_info
 from app.core.perceptual import BKTree
@@ -30,7 +31,7 @@ from app.core.similarity import MatchCategory, distance_cutoff
 class Decision(str, Enum):
     UNDECIDED = "undecided"
     KEEP = "keep"
-    DELETE = "delete"        # marked for deletion only - never executed here
+    DELETE = "delete"  # marked for deletion only - never executed here
 
 
 @dataclass
@@ -39,41 +40,41 @@ class FileRecord:
     size: int
     mtime: float
     kind: FileKind
-    sha256: Optional[str] = None
-    error: Optional[str] = None
+    sha256: str | None = None
+    error: str | None = None
 
     # phase 2 analysis data
-    pixel_digest: Optional[str] = None
-    phash: Optional[int] = None
-    dhash: Optional[int] = None
-    ahash: Optional[int] = None
-    bhash: Optional[int] = None          # phase 6 - 256-bit layout hash
-    color_sig: Optional[str] = None      # phase 6 - HS histogram
-    embedding: Optional[list] = None     # phase 6 - optional CLIP-style vector
-    width: Optional[int] = None
-    height: Optional[int] = None
+    pixel_digest: str | None = None
+    phash: int | None = None
+    dhash: int | None = None
+    ahash: int | None = None
+    bhash: int | None = None  # phase 6 - 256-bit layout hash
+    color_sig: str | None = None  # phase 6 - HS histogram
+    embedding: list | None = None  # phase 6 - optional CLIP-style vector
+    width: int | None = None
+    height: int | None = None
 
     # phase 4 (video) analysis data
-    video_info: Optional[object] = None      # core.video_analyzer.VideoInfo
-    frame_hashes: Optional[list] = None       # list[Optional[int]]
+    video_info: object | None = None  # core.video_analyzer.VideoInfo
+    frame_hashes: list | None = None  # list[Optional[int]]
 
     # set when the record is part of a "similar" group: how close it is to the
     # group's anchor file, as a percentage.
-    similarity_percent: Optional[float] = None
+    similarity_percent: float | None = None
 
     # UI state
     decision: Decision = Decision.UNDECIDED
     reviewed: bool = False
-    deleted: bool = False        # set once the file was trashed / removed
+    deleted: bool = False  # set once the file was trashed / removed
 
-    _image_info: Optional[ImageInfo] = field(default=None, repr=False)
+    _image_info: ImageInfo | None = field(default=None, repr=False)
 
     @property
     def name(self) -> str:
         return os.path.basename(self.path)
 
     @property
-    def resolution(self) -> Optional[tuple[int, int]]:
+    def resolution(self) -> tuple[int, int] | None:
         if self.width and self.height:
             return self.width, self.height
         info = self.image_info()
@@ -96,7 +97,7 @@ class DuplicateGroup:
     category: MatchCategory
     records: list[FileRecord]
     ignored: bool = False
-    similarity_percent: Optional[float] = None   # representative, for "similar" groups
+    similarity_percent: float | None = None  # representative, for "similar" groups
     match_reasons: list[str] = field(default_factory=list)  # "por qué se agruparon"
 
     @property
@@ -156,15 +157,15 @@ class DuplicateGroup:
 
     @property
     def is_reviewed(self) -> bool:
-        return self.ignored or all(r.reviewed for r in self.records) or any(
-            r.decision is not Decision.UNDECIDED for r in self.records
+        return (
+            self.ignored
+            or all(r.reviewed for r in self.records)
+            or any(r.decision is not Decision.UNDECIDED for r in self.records)
         )
 
     @property
     def has_unsafe_decision(self) -> bool:
-        return bool(self.records) and all(
-            r.decision is Decision.DELETE for r in self.records
-        )
+        return bool(self.records) and all(r.decision is Decision.DELETE for r in self.records)
 
 
 # ---------------------------------------------------------------------------
@@ -194,9 +195,7 @@ def build_exact_groups(records: Iterable[FileRecord]) -> list[DuplicateGroup]:
     for members in by_hash.values():
         if len(members) < 2:
             continue
-        groups.append(
-            DuplicateGroup(0, MatchCategory.FILE_IDENTICAL, _sort_members(members))
-        )
+        groups.append(DuplicateGroup(0, MatchCategory.FILE_IDENTICAL, _sort_members(members)))
     groups.sort(key=lambda g: (g.count - 1) * g.unit_size, reverse=True)
     for index, group in enumerate(groups, start=1):
         group.group_id = index
@@ -209,7 +208,7 @@ def build_groups(
     profile=None,
     enable_perceptual: bool = False,
     enable_video: bool = False,
-    crop_edges: Optional[list] = None,
+    crop_edges: list | None = None,
 ) -> list[DuplicateGroup]:
     """Layered grouping. ``profile`` is a
     :class:`app.core.similarity_engine.SensitivityProfile` (default = medium).
@@ -220,7 +219,10 @@ def build_groups(
     if profile is None:
         profile = SensitivityProfile(
             bands=SimilarityBands().clamped(),
-            weights=None, detect_crops=False, detect_resized=True, dhash_confirm=10,
+            weights=None,
+            detect_crops=False,
+            detect_resized=True,
+            dhash_confirm=10,
         )
 
     records = list(records)
@@ -256,18 +258,18 @@ def build_groups(
     for members in by_hash.values():
         if len(members) < 2:
             continue
-        groups.append(
-            DuplicateGroup(0, MatchCategory.FILE_IDENTICAL, _sort_members(members))
-        )
+        groups.append(DuplicateGroup(0, MatchCategory.FILE_IDENTICAL, _sort_members(members)))
         assigned.update(id(m) for m in members)
 
     # -- layer 3: combined-signal similarity (images) ----------------
     if enable_perceptual:
         groups.extend(
             _similarity_groups(
-                [r for r in records
-                 if id(r) not in assigned and r.kind is FileKind.IMAGE
-                 and r.phash is not None],
+                [
+                    r
+                    for r in records
+                    if id(r) not in assigned and r.kind is FileKind.IMAGE and r.phash is not None
+                ],
                 profile,
                 crop_edges or [],
             )
@@ -275,18 +277,13 @@ def build_groups(
 
     # -- layer 4: video (byte-identical + sampled-frame similarity) --
     if enable_video:
-        vids = [
-            r for r in records
-            if id(r) not in assigned and r.kind is FileKind.VIDEO
-        ]
+        vids = [r for r in records if id(r) not in assigned and r.kind is FileKind.VIDEO]
         groups.extend(_video_groups(vids, profile.bands.similar))
 
     return _assign_ids(groups)
 
 
-def _video_groups(
-    candidates: list[FileRecord], threshold: float
-) -> list[DuplicateGroup]:
+def _video_groups(candidates: list[FileRecord], threshold: float) -> list[DuplicateGroup]:
     """Group videos by two kinds of evidence at once:
 
     * identical SHA-256  -> the files are byte-identical
@@ -338,7 +335,7 @@ def _video_groups(
     pair_pct: dict[frozenset[int], float] = {}
     frame_recs = [r for r in candidates if has_frames(r)]
     for i, a in enumerate(frame_recs):
-        for b in frame_recs[i + 1:]:
+        for b in frame_recs[i + 1 :]:
             if abs(duration(a) - duration(b)) > 2.0:
                 continue
             pct = compare_frame_hashes(a.frame_hashes, b.frame_hashes)
@@ -359,18 +356,13 @@ def _video_groups(
         ids = [id(m) for m in members]
         anchor = max(members, key=lambda r: r.size)
 
-        all_same_hash = (
-            len({m.sha256 for m in members}) == 1
-            and all(m.sha256 for m in members)
-        )
+        all_same_hash = len({m.sha256 for m in members}) == 1 and all(m.sha256 for m in members)
         if all_same_hash:
             category = MatchCategory.FILE_IDENTICAL
             rep = 100.0
         else:
             # weakest frame link that holds the cluster together
-            pcts = [
-                p for key, p in pair_pct.items() if key.issubset(set(ids))
-            ]
+            pcts = [p for key, p in pair_pct.items() if key.issubset(set(ids))]
             rep = min(pcts) if pcts else float(threshold)
             durations = [duration(m) for m in members]
             same_duration = max(durations) - min(durations) <= 0.75
@@ -379,9 +371,7 @@ def _video_groups(
                 continue
 
         for rec in members:
-            if rec is anchor:
-                rec.similarity_percent = 100.0
-            elif rec.sha256 and rec.sha256 == anchor.sha256:
+            if rec is anchor or (rec.sha256 and rec.sha256 == anchor.sha256):
                 rec.similarity_percent = 100.0
             elif has_frames(rec) and has_frames(anchor):
                 pct = compare_frame_hashes(rec.frame_hashes, anchor.frame_hashes)
@@ -389,10 +379,14 @@ def _video_groups(
             else:
                 rec.similarity_percent = rep
 
-        groups.append(DuplicateGroup(
-            0, category, members,
-            similarity_percent=None if category is MatchCategory.FILE_IDENTICAL else rep,
-        ))
+        groups.append(
+            DuplicateGroup(
+                0,
+                category,
+                members,
+                similarity_percent=None if category is MatchCategory.FILE_IDENTICAL else rep,
+            )
+        )
     return groups
 
 
@@ -400,8 +394,13 @@ def _signals(rec: FileRecord):
     from app.core.similarity_engine import Signals
 
     return Signals(
-        phash=rec.phash, dhash=rec.dhash, ahash=rec.ahash, bhash=rec.bhash,
-        color_sig=rec.color_sig, width=rec.width, height=rec.height,
+        phash=rec.phash,
+        dhash=rec.dhash,
+        ahash=rec.ahash,
+        bhash=rec.bhash,
+        color_sig=rec.color_sig,
+        width=rec.width,
+        height=rec.height,
     )
 
 
@@ -451,8 +450,10 @@ def _similarity_groups(
                 continue
             seen.add(key)
             res = combined_score(
-                _signals(rec), _signals(other),
-                weights=weights, detect_resized=profile.detect_resized,
+                _signals(rec),
+                _signals(other),
+                weights=weights,
+                detect_resized=profile.detect_resized,
             )
             # anti-false-positive: composition must not be wildly different
             if res.per_signal.get("bhash", 100.0) < 55.0:
@@ -495,17 +496,17 @@ def _similarity_groups(
                 rec.similarity_percent = 100.0
                 continue
             res = combined_score(
-                _signals(rec), _signals(anchor),
-                weights=weights, detect_resized=profile.detect_resized,
+                _signals(rec),
+                _signals(anchor),
+                weights=weights,
+                detect_resized=profile.detect_resized,
             )
             rec.similarity_percent = res.score
             headline = max(headline, res.score)
             weakest = min(weakest, res.score)
 
         cluster_edges = [r for k, r in edges.items() if k <= ids]
-        has_resize_edge = any(
-            e.upgrade is MatchCategory.RESIZED_DUPLICATE for e in cluster_edges
-        )
+        has_resize_edge = any(e.upgrade is MatchCategory.RESIZED_DUPLICATE for e in cluster_edges)
         distinct_res = len({(m.width, m.height) for m in members if m.width}) > 1
 
         # RESIZED_DUPLICATE only when resolution is the *only* difference:
@@ -526,11 +527,15 @@ def _similarity_groups(
             "resoluci" in r for r in reasons
         ):
             reasons.insert(0, "misma imagen a distinta resolución")
-        groups.append(DuplicateGroup(
-            0, category, members,
-            similarity_percent=round(headline, 1) if headline else None,
-            match_reasons=reasons[:6],
-        ))
+        groups.append(
+            DuplicateGroup(
+                0,
+                category,
+                members,
+                similarity_percent=round(headline, 1) if headline else None,
+                match_reasons=reasons[:6],
+            )
+        )
 
     # ---- crop groups: run last, only for images not already grouped ----
     if crop_edges:
@@ -555,15 +560,19 @@ def _similarity_groups(
                 small.similarity_percent = score
             _, _, region = max(crops, key=lambda c: c[1])
             x0, y0, x1, y1 = region
-            groups.append(DuplicateGroup(
-                0, MatchCategory.CROPPED_SIMILAR, members,
-                similarity_percent=round(best, 1),
-                match_reasons=[
-                    "una imagen parece un recorte (encuadre parcial) de la otra",
-                    f"región coincidente ≈ {int((x1 - x0) * 100)}% × {int((y1 - y0) * 100)}% del original",
-                    "distinta relación de aspecto",
-                ],
-            ))
+            groups.append(
+                DuplicateGroup(
+                    0,
+                    MatchCategory.CROPPED_SIMILAR,
+                    members,
+                    similarity_percent=round(best, 1),
+                    match_reasons=[
+                        "una imagen parece un recorte (encuadre parcial) de la otra",
+                        f"región coincidente ≈ {int((x1 - x0) * 100)}% × {int((y1 - y0) * 100)}% del original",
+                        "distinta relación de aspecto",
+                    ],
+                )
+            )
 
     return groups
 
@@ -644,8 +653,7 @@ class AnalysisResult:
     @property
     def video_groups_all(self) -> list[DuplicateGroup]:
         return [
-            g for g in self.groups
-            if g.records and all(r.kind is FileKind.VIDEO for r in g.records)
+            g for g in self.groups if g.records and all(r.kind is FileKind.VIDEO for r in g.records)
         ]
 
     @property
@@ -671,9 +679,7 @@ class AnalysisResult:
     @property
     def redundant_copies(self) -> int:
         """Files that could still be removed keeping one per group."""
-        return sum(
-            max(0, len(g.active_records) - 1) for g in self.groups
-        )
+        return sum(max(0, len(g.active_records) - 1) for g in self.groups)
 
     @property
     def reclaimable_bytes(self) -> int:

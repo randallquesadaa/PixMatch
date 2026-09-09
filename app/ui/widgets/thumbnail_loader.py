@@ -4,6 +4,7 @@ A :class:`QRunnable` renders (or fetches from cache) the PNG bytes on a pool
 thread and hands them back to the GUI thread via a signal, where they become a
 ``QPixmap``. The GUI thread never decodes a full-resolution image.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal
@@ -18,7 +19,7 @@ _POOL.setMaxThreadCount(max(2, min(6, _POOL.maxThreadCount())))
 
 
 class _Signals(QObject):
-    done = Signal(str, object)   # path, QPixmap or None
+    done = Signal(str, object)  # path, QPixmap or None
 
 
 class _ThumbTask(QRunnable):
@@ -38,8 +39,10 @@ class _ThumbTask(QRunnable):
             if pm.loadFromData(png, "PNG"):
                 if pm.width() > self._edge or pm.height() > self._edge:
                     pm = pm.scaled(
-                        self._edge, self._edge,
-                        Qt.KeepAspectRatio, Qt.SmoothTransformation,
+                        self._edge,
+                        self._edge,
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
                     )
                 pixmap = pm
         try:

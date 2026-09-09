@@ -1,4 +1,5 @@
 """Pause / resume / cancel primitive."""
+
 from __future__ import annotations
 
 import threading

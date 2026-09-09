@@ -9,10 +9,10 @@ These feed :mod:`app.core.similarity_engine`, which combines them into one
 weighted score. Computing them together avoids decoding the same file five
 times.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from PIL import Image, ImageOps
 
@@ -39,7 +39,7 @@ class ImageSignatures:
         return self.width / self.height if self.height else 0.0
 
 
-def compute_signatures(path: str) -> Optional[ImageSignatures]:
+def compute_signatures(path: str) -> ImageSignatures | None:
     try:
         with Image.open(extended_path(path)) as img:
             oriented = ImageOps.exif_transpose(img)
@@ -48,6 +48,6 @@ def compute_signatures(path: str) -> Optional[ImageSignatures]:
             phash, dhash, ahash, bhash = hashes_from_gray(gray)
             color_sig = signature_from_image(oriented)
             return ImageSignatures(phash, dhash, ahash, bhash, color_sig, w, h)
-    except Exception as exc:  # noqa: BLE001 - corrupt / unsupported / bomb
+    except Exception as exc:
         log.debug("signatures failed for %s: %s", path, exc)
         return None

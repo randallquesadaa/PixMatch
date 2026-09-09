@@ -1,0 +1,207 @@
+name: Release
+
+# Every push to main runs the full CI suite. If it passes AND the version in
+# app/__init__.py has been bumped to a value with no matching git tag, this
+# workflow tags the commit, builds standalone executables for Linux, macOS and
+# Windows, and publishes a GitHub Release with those files attached.
+#
+#   → To cut a release: bump __version__ in a PR. Merging it ships the release.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  guard:
+    name: Decide whether to release
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      version: ${{ steps.decide.outputs.version }}
+      tag: ${{ steps.decide.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: decide
+        run: |
+          set -euo pipefail
+          VERSION="$(python -c 'import app; print(app.__version__)')"
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists — nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version ${VERSION} — will release as ${TAG}."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Summary
+        run: |
+          echo "### Release decision" >> "$GITHUB_STEP_SUMMARY"
+          echo "- version: \`${{ steps.decide.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- will release: \`${{ steps.decide.outputs.release }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: guard
+    if: needs.guard.outputs.release == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+            asset: PixMatch-${{ needs.guard.outputs.version }}-linux-x86_64.tar.gz
+          - os: macos-latest
+            target: macos-arm64
+            asset: PixMatch-${{ needs.guard.outputs.version }}-macos-arm64.zip
+          - os: windows-latest
+            target: windows-x64
+            asset: PixMatch-${{ needs.guard.outputs.version }}-windows-x64.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install "pyinstaller>=6.0"
+        # NOTE: imageio-ffmpeg is deliberately NOT installed. Its bundled FFmpeg
+        # is GPL; shipping it would force the whole binary under the GPL. PixMatch
+        # binaries stay MIT-clean and detect a system FFmpeg at runtime for video.
+
+      - name: Qt runtime libraries (Linux)
+        if: runner.os == 'Linux'
+        # Installed so PyInstaller discovers and bundles them into the tarball,
+        # so the Linux build runs on a bare machine without extra packages.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libglib2.0-0 libdbus-1-3 libfontconfig1 libfreetype6 \
+            libxkbcommon0 libxkbcommon-x11-0 libxcb1 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-sync1 \
+            libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1
+
+      - name: Generate macOS icon (.icns)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          ICONSET="$(mktemp -d)/icon.iconset"; mkdir -p "$ICONSET"
+          for s in 16 32 64 128 256 512; do
+            sips -z $s $s packaging/resources/icon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+            d=$((s * 2))
+            sips -z $d $d packaging/resources/icon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$ICONSET" -o packaging/resources/icon.icns
+
+      - name: Build (PyInstaller)
+        run: pyinstaller packaging/PixMatch.spec --noconfirm
+
+      - name: Smoke-test the binary
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            "./dist/PixMatch/PixMatch.exe" --version
+          else
+            "./dist/PixMatch/PixMatch" --version
+          fi
+
+      - name: Smoke-test the app bundle (macOS)
+        if: runner.os == 'macOS'
+        run: ./dist/PixMatch.app/Contents/MacOS/PixMatch --version
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -C dist -czf "${{ matrix.asset }}" PixMatch
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent "dist/PixMatch.app" "${{ matrix.asset }}"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/PixMatch -DestinationPath "${{ matrix.asset }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: ${{ matrix.asset }}
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [guard, build]
+    if: needs.guard.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag + release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist-artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist-artifacts
+        run: sha256sum * | tee SHA256SUMS.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.guard.outputs.tag }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          NOTES_FILE="$(mktemp)"
+          cat > "$NOTES_FILE" <<'EOF'
+          ## Descargas
+
+          | Sistema | Archivo |
+          |---|---|
+          | **Windows 10/11 (x64)** | `PixMatch-VERSION-windows-x64.zip` — descomprime y ejecuta `PixMatch.exe` |
+          | **macOS (Apple Silicon)** | `PixMatch-VERSION-macos-arm64.zip` — al abrir por primera vez: clic derecho → *Abrir* |
+          | **Linux (x86-64)** | `PixMatch-VERSION-linux-x86_64.tar.gz` — extrae y ejecuta `./PixMatch/PixMatch` |
+
+          No hace falta instalar Python ni nada más para analizar **imágenes**.
+          Para analizar **vídeos**, instala FFmpeg (`winget install Gyan.FFmpeg`,
+          `brew install ffmpeg`, `apt install ffmpeg`); PixMatch lo detecta solo.
+
+          Los binarios no están firmados. Verifica la descarga con `SHA256SUMS.txt`.
+          EOF
+          sed -i "s/VERSION/${VERSION}/g" "$NOTES_FILE"
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "PixMatch ${TAG}" \
+            --notes-file "$NOTES_FILE" \
+            dist-artifacts/*

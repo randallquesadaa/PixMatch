@@ -1,4 +1,5 @@
 """Phase 2 pipeline: pixel-identical, perceptual similarity and the cache."""
+
 from __future__ import annotations
 
 import shutil
@@ -68,7 +69,7 @@ def test_resized_copy_is_similar_only_when_enabled(tmp_path):
     )
     assert groups[0].similarity_percent is not None
     assert any(r.similarity_percent is not None for r in groups[0].records)
-    assert groups[0].match_reasons     # "por qué se agruparon"
+    assert groups[0].match_reasons  # "por qué se agruparon"
 
 
 def test_unrelated_images_not_grouped_as_similar(tmp_path):

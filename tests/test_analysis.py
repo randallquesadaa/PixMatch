@@ -1,4 +1,5 @@
 """End-to-end Phase 1 pipeline tests (scan -> hash -> group)."""
+
 from __future__ import annotations
 
 import os

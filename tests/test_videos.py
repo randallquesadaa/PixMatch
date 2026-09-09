@@ -1,4 +1,5 @@
 """Video analysis: metadata, frame-hash similarity, grouping, cache."""
+
 from __future__ import annotations
 
 import shutil
@@ -46,9 +47,25 @@ def test_frame_hashes_and_comparison(tmp_path, make_video, ffmpeg_tools):
     import subprocess
 
     subprocess.run(
-        [ffmpeg_tools.ffmpeg, "-nostdin", "-y", "-loglevel", "error",
-         "-i", str(a), "-c:v", "libx264", "-crf", "38", "-c:a", "aac", str(a_reenc)],
-        check=True, capture_output=True, timeout=60,
+        [
+            ffmpeg_tools.ffmpeg,
+            "-nostdin",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(a),
+            "-c:v",
+            "libx264",
+            "-crf",
+            "38",
+            "-c:a",
+            "aac",
+            str(a_reenc),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
     )
     b = make_video(tmp_path / "b.mp4", pattern="testsrc2", duration=3)
 
@@ -62,8 +79,8 @@ def test_frame_hashes_and_comparison(tmp_path, make_video, ffmpeg_tools):
 
     assert len([h for h in ha if h is not None]) >= 4
     assert compare_frame_hashes(ha, ha) == 100.0
-    assert compare_frame_hashes(ha, hr) >= 90.0     # re-encode stays close
-    assert compare_frame_hashes(ha, hb) < 80.0      # different content
+    assert compare_frame_hashes(ha, hr) >= 90.0  # re-encode stays close
+    assert compare_frame_hashes(ha, hb) < 80.0  # different content
 
 
 def test_compare_needs_overlap():
@@ -95,16 +112,33 @@ def test_reencoded_video_grouped_as_probable_same_content(tmp_path, make_video, 
     import subprocess
 
     subprocess.run(
-        [ffmpeg_tools.ffmpeg, "-nostdin", "-y", "-loglevel", "error",
-         "-i", str(a), "-c:v", "libx264", "-crf", "30", "-c:a", "aac",
-         str(tmp_path / "orig_recompressed.mp4")],
-        check=True, capture_output=True, timeout=60,
+        [
+            ffmpeg_tools.ffmpeg,
+            "-nostdin",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(a),
+            "-c:v",
+            "libx264",
+            "-crf",
+            "30",
+            "-c:a",
+            "aac",
+            str(tmp_path / "orig_recompressed.mp4"),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
     )
     result = run_analysis(str(tmp_path), _cfg(similarity_threshold=85))
     assert len(result.groups) == 1
     g = result.groups[0]
     assert g.category in (
-        MatchCategory.SAME_CONTENT_LIKELY, MatchCategory.VERY_SIMILAR, MatchCategory.SIMILAR
+        MatchCategory.SAME_CONTENT_LIKELY,
+        MatchCategory.VERY_SIMILAR,
+        MatchCategory.SIMILAR,
     )
     assert g.similarity_percent is not None
 
@@ -121,10 +155,25 @@ def test_byte_identical_plus_reencode_land_in_one_group(tmp_path, make_video, ff
     import subprocess
 
     subprocess.run(
-        [ffmpeg_tools.ffmpeg, "-nostdin", "-y", "-loglevel", "error",
-         "-i", str(a), "-c:v", "libx264", "-crf", "32", "-c:a", "aac",
-         str(tmp_path / "v_small.mp4")],
-        check=True, capture_output=True, timeout=60,
+        [
+            ffmpeg_tools.ffmpeg,
+            "-nostdin",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(a),
+            "-c:v",
+            "libx264",
+            "-crf",
+            "32",
+            "-c:a",
+            "aac",
+            str(tmp_path / "v_small.mp4"),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
     )
     result = run_analysis(str(tmp_path), _cfg(similarity_threshold=85))
     assert len(result.groups) == 1
@@ -137,9 +186,7 @@ def test_video_analysis_without_ffmpeg_does_not_crash(tmp_path, make_video, monk
 
     from app.core import ffmpeg as ffmpeg_mod
 
-    monkeypatch.setattr(
-        ffmpeg_mod, "detect", lambda *a, **k: ffmpeg_mod.FfmpegTools(source="none")
-    )
+    monkeypatch.setattr(ffmpeg_mod, "detect", lambda *a, **k: ffmpeg_mod.FfmpegTools(source="none"))
     result = run_analysis(str(tmp_path), _cfg())
     assert result.ffmpeg_available is False
     # byte-identical files are still caught by SHA-256
@@ -153,15 +200,30 @@ def test_incremental_reuses_video_cache(tmp_path, make_video, ffmpeg_tools):
     import subprocess
 
     subprocess.run(
-        [ffmpeg_tools.ffmpeg, "-nostdin", "-y", "-loglevel", "error",
-         "-i", str(a), "-c:v", "libx264", "-crf", "30", "-c:a", "aac",
-         str(tmp_path / "a2.mp4")],
-        check=True, capture_output=True, timeout=60,
+        [
+            ffmpeg_tools.ffmpeg,
+            "-nostdin",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(a),
+            "-c:v",
+            "libx264",
+            "-crf",
+            "30",
+            "-c:a",
+            "aac",
+            str(tmp_path / "a2.mp4"),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
     )
     first = run_analysis(str(tmp_path), _cfg(), db_path=str(db))
     assert first.videos_probed == 2
 
     second = run_analysis(str(tmp_path), _cfg(), db_path=str(db), incremental=True)
     assert second.cache_hits >= 2
-    assert second.video_frames_sampled == 0     # reused from cache
+    assert second.video_frames_sampled == 0  # reused from cache
     assert len(second.groups) == len(first.groups)

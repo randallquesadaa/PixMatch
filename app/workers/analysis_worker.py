@@ -4,6 +4,7 @@ The heavy work runs in a :class:`QThread`; the UI only ever touches this
 object's signals. Pause / resume / cancel are delegated to a thread-safe
 :class:`RunController`.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, QThread, Signal
@@ -23,7 +24,7 @@ log = get_logger(__name__)
 
 
 class _SignalCallbacks(AnalysisCallbacks):
-    def __init__(self, worker: "AnalysisWorker") -> None:
+    def __init__(self, worker: AnalysisWorker) -> None:
         self._w = worker
 
     def on_phase(self, phase: str) -> None:
@@ -41,10 +42,10 @@ class _SignalCallbacks(AnalysisCallbacks):
 
 class AnalysisWorker(QObject):
     phase_changed = Signal(str)
-    scan_progress = Signal(object)     # ScanStats
-    step_progress = Signal(object)     # StepProgress
+    scan_progress = Signal(object)  # ScanStats
+    step_progress = Signal(object)  # StepProgress
     message = Signal(str)
-    finished = Signal(object)          # AnalysisResult
+    finished = Signal(object)  # AnalysisResult
     failed = Signal(str)
 
     def __init__(self, root: str, config: AppConfig, incremental: bool = False) -> None:
@@ -75,7 +76,7 @@ class AnalysisWorker(QObject):
                 incremental=self._incremental,
             )
             self.finished.emit(result)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("Analysis crashed")
             self.failed.emit(str(exc))
 
