@@ -22,11 +22,14 @@ try:  # pragma: no cover - depends on the environment
 
     pillow_heif.register_heif_opener()
 except Exception:
+    # optional dependency - HEIC/HEIF just stays unsupported if it is missing
+    # or fails to register; never a reason to stop the app.
     pass
 
 try:  # pragma: no cover
     import pillow_avif  # type: ignore  # noqa: F401
 except Exception:
+    # optional dependency - AVIF stays unsupported if the plugin is absent.
     pass
 
 # Raise the default 89 MP limit (many phone panoramas exceed it) but keep a

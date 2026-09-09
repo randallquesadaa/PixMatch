@@ -76,6 +76,7 @@ class ThumbnailCache:
                 self._store_mem(key, data)
                 return data
             except OSError:
+                # unreadable / vanished cache file - fall through and re-render.
                 pass
 
         data = self._render(path)
@@ -87,6 +88,8 @@ class ThumbnailCache:
                 fh.write(data)
             os.replace(tmp, disk)
         except OSError:
+            # cache dir not writable / disk full - the thumbnail still works
+            # this session from memory; persisting it is best-effort.
             pass
         self._store_mem(key, data)
         return data

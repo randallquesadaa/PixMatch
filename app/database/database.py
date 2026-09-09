@@ -142,5 +142,7 @@ class FileCacheDB:
             try:
                 self._conn.close()
             except sqlite3.Error:
+                # already closing / half-open: nothing useful to do, the cache
+                # is optional and we are on the teardown path anyway.
                 pass
             self._conn = None

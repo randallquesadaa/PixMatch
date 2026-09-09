@@ -110,9 +110,9 @@ def _probe_with_ffprobe(path: str, ffprobe: str) -> VideoInfo:
 
 _DUR_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)")
 _BITRATE_RE = re.compile(r"bitrate:\s*(\d+)\s*kb/s")
-_VIDEO_RE = re.compile(r"Stream #\d+:\d+.*?: Video:\s*([\w0-9]+).*?(\d{2,5})x(\d{2,5})", re.DOTALL)
+_VIDEO_RE = re.compile(r"Stream #\d+:\d+.*?: Video:\s*(\w+).*?(\d{2,5})x(\d{2,5})", re.DOTALL)
 _FPS_RE = re.compile(r"([\d.]+)\s*fps")
-_AUDIO_RE = re.compile(r"Stream #\d+:\d+.*?: Audio:\s*([\w0-9]+)")
+_AUDIO_RE = re.compile(r"Stream #\d+:\d+.*?: Audio:\s*(\w+)")
 _CREATION_RE = re.compile(r"creation_time\s*:\s*(\S+)")
 
 
