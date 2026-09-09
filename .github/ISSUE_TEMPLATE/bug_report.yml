@@ -1,0 +1,56 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a folder with ...
+        2. Run analysis with ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PixMatch version
+      description: Help → About, or `pixmatch --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: install
+    attributes:
+      label: How did you install it?
+      placeholder: "Release .zip / pip install -e . / from source"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output
+      description: "Settings → Logs → Open log folder. Paste anything relevant (redact paths if needed)."
+      render: text
+  - type: checkboxes
+    id: no-data
+    attributes:
+      label: Confirmation
+      options:
+        - label: This report contains no private file paths or personal data I don't want public
+          required: true
