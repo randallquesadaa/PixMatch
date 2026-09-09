@@ -4,6 +4,7 @@ All three are read-only snapshots of what the analysis found and what the user
 decided. The HTML report embeds thumbnails as data: URIs so it is a single
 portable file.
 """
+
 from __future__ import annotations
 
 import base64
@@ -16,7 +17,7 @@ from pathlib import Path
 from app.core.duplicate_groups import AnalysisResult, FileRecord
 from app.utils.file_utils import human_size
 
-_THUMB_LIMIT = 1500       # stop embedding thumbnails past this many files
+_THUMB_LIMIT = 1500  # stop embedding thumbnails past this many files
 _THUMB_EDGE = 160
 
 
@@ -60,9 +61,20 @@ def _rows(result: AnalysisResult):
 def export_csv(result: AnalysisResult, path: str | Path) -> Path:
     path = Path(path)
     fields = [
-        "group_id", "category", "category_label", "similarity_percent",
-        "decision", "deleted", "name", "path", "size_bytes", "size_human",
-        "resolution", "sha256", "pixel_digest", "phash",
+        "group_id",
+        "category",
+        "category_label",
+        "similarity_percent",
+        "decision",
+        "deleted",
+        "name",
+        "path",
+        "size_bytes",
+        "size_human",
+        "resolution",
+        "sha256",
+        "pixel_digest",
+        "phash",
     ]
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields)
@@ -161,7 +173,7 @@ _HTML_HEAD = """<!doctype html>
 def _thumb_data_uri(cache, rec: FileRecord) -> str:
     try:
         png = cache.get_png(rec.path, rec.size, rec.mtime)
-    except Exception:  # noqa: BLE001
+    except Exception:
         png = None
     if not png:
         return ""
@@ -203,7 +215,9 @@ def export_html(
         ("Copias redundantes", f"{result.redundant_copies:,}"),
         ("Espacio recuperable", human_size(result.reclaimable_bytes)),
     ]:
-        parts.append(f"<div><span class='k'>{html.escape(label)}</span><b>{html.escape(value)}</b></div>")
+        parts.append(
+            f"<div><span class='k'>{html.escape(label)}</span><b>{html.escape(value)}</b></div>"
+        )
     parts.append("</div>")
 
     if not embed and include_thumbnails:
@@ -214,13 +228,17 @@ def export_html(
 
     for group in result.groups:
         style = group.category.style
-        sim = "" if group.similarity_percent is None else f" &middot; similitud ≈ {group.similarity_percent:.1f}%"
+        sim = (
+            ""
+            if group.similarity_percent is None
+            else f" &middot; similitud ≈ {group.similarity_percent:.1f}%"
+        )
         parts.append('<div class="group">')
         parts.append(
             f'<span class="badge" style="background:{style.color}">'
-            f'{html.escape(style.short_es)}</span> '
-            f'&nbsp;<b>Grupo #{group.group_id}</b> &mdash; {group.count} archivos{sim} '
-            f'&middot; recuperable {human_size(group.potential_reclaimable)}'
+            f"{html.escape(style.short_es)}</span> "
+            f"&nbsp;<b>Grupo #{group.group_id}</b> &mdash; {group.count} archivos{sim} "
+            f"&middot; recuperable {human_size(group.potential_reclaimable)}"
         )
         parts.append('<div class="files">')
         for rec in group.records:
@@ -239,17 +257,17 @@ def export_html(
                 dcls, dtxt = "k", "sin decidir"
             res = _resolution(rec)
             parts.append(f'<div class="{dcls}">{dtxt}</div>')
-            parts.append(f'<b>{html.escape(rec.name)}</b><br>')
+            parts.append(f"<b>{html.escape(rec.name)}</b><br>")
             parts.append(f'<span class="k">{html.escape(rec.path)}</span><br>')
-            parts.append(f'{human_size(rec.size)}')
+            parts.append(f"{human_size(rec.size)}")
             if res:
-                parts.append(f' &middot; {res}')
+                parts.append(f" &middot; {res}")
             if rec.similarity_percent is not None:
-                parts.append(f' &middot; {rec.similarity_percent:.1f}% sim.')
+                parts.append(f" &middot; {rec.similarity_percent:.1f}% sim.")
             if rec.sha256:
-                parts.append(f'<br><code>sha256:{html.escape(rec.sha256[:24])}…</code>')
-            parts.append('</div>')
-        parts.append('</div></div>')
+                parts.append(f"<br><code>sha256:{html.escape(rec.sha256[:24])}…</code>")
+            parts.append("</div>")
+        parts.append("</div></div>")
 
     parts.append("</div></body></html>")
     path.write_text("".join(parts), encoding="utf-8")

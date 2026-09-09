@@ -1,5 +1,6 @@
 """Theme switching must actually flip text colours, including on nested and
 already-created widgets (regression: text stayed white going dark -> light)."""
+
 from __future__ import annotations
 
 import os
@@ -9,10 +10,10 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtGui import QPalette  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget  # noqa: E402
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
-from app.ui.theme import apply_theme  # noqa: E402
+from app.ui.theme import apply_theme
 
 
 @pytest.fixture(scope="module")
@@ -95,7 +96,7 @@ def test_text_colours_meet_wcag_contrast(qapp):
         base = pal.color(QPalette.Base)
 
         body = pal.color(QPalette.WindowText)
-        muted = pal.color(QPalette.PlaceholderText)          # #Hint / captions
+        muted = pal.color(QPalette.PlaceholderText)  # #Hint / captions
         disabled = pal.color(QPalette.Disabled, QPalette.WindowText)
 
         assert _contrast(body, window) >= 7.0, (theme, "body text")

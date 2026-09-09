@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from app.core.duplicate_groups import (
     Decision,
-    DuplicateGroup,
     FileRecord,
     build_exact_groups,
 )
@@ -76,10 +75,10 @@ def test_deleted_records_resolve_group_and_shrink_totals():
 
     groups[0].records[0].deleted = True
     assert r.redundant_copies == 1 and r.reclaimable_bytes == 1000
-    assert not groups[0].is_resolved   # 2 active left
+    assert not groups[0].is_resolved  # 2 active left
 
     groups[0].records[1].deleted = True
-    assert groups[0].is_resolved       # only 1 active left
+    assert groups[0].is_resolved  # only 1 active left
     assert r.redundant_copies == 0 and r.reclaimable_bytes == 0
     assert r.deleted_file_count == 2
     assert r.unresolved_groups == []

@@ -8,6 +8,7 @@ Order of preference:
 If nothing is found, video analysis is disabled and the user is told how to
 install FFmpeg. Nothing here ever modifies a media file.
 """
+
 from __future__ import annotations
 
 import os
@@ -15,7 +16,6 @@ import platform
 import shutil
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
 
 from app.utils.logging_setup import get_logger
 
@@ -26,10 +26,10 @@ _SYSTEM = platform.system()
 
 @dataclass
 class FfmpegTools:
-    ffmpeg: Optional[str] = None
-    ffprobe: Optional[str] = None
-    ffmpeg_version: Optional[str] = None
-    source: str = "none"          # config | path | bundled | none
+    ffmpeg: str | None = None
+    ffprobe: str | None = None
+    ffmpeg_version: str | None = None
+    source: str = "none"  # config | path | bundled | none
 
     @property
     def available(self) -> bool:
@@ -63,7 +63,7 @@ def _exe_names(base: str) -> list[str]:
     return [base + ".exe", base] if _SYSTEM == "Windows" else [base]
 
 
-def _resolve(configured: str, base: str) -> Optional[str]:
+def _resolve(configured: str, base: str) -> str | None:
     """Turn a user setting (file or directory) into an executable path."""
     configured = configured.strip()
     if not configured:
@@ -77,11 +77,13 @@ def _resolve(configured: str, base: str) -> Optional[str]:
     return configured if os.path.isfile(configured) else None
 
 
-def _probe_version(path: str) -> Optional[str]:
+def _probe_version(path: str) -> str | None:
     try:
         result = subprocess.run(
             [path, "-version"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
             creationflags=_no_window(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
@@ -99,13 +101,13 @@ def _no_window() -> int:
     return 0
 
 
-def _bundled_ffmpeg() -> Optional[str]:
+def _bundled_ffmpeg() -> str | None:
     try:
         import imageio_ffmpeg  # type: ignore
 
         exe = imageio_ffmpeg.get_ffmpeg_exe()
         return exe if exe and os.path.isfile(exe) else None
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -132,14 +134,11 @@ def detect(configured_ffmpeg: str = "", configured_ffprobe: str = "") -> FfmpegT
     probe_config = _resolve(configured_ffprobe, "ffprobe")
     if probe_config and _probe_version(probe_config):
         tools.ffprobe = probe_config
-    if tools.ffprobe is None:
+    if tools.ffprobe is None and tools.ffmpeg:
         # try a sibling of the chosen ffmpeg first
-        if tools.ffmpeg:
-            sibling = os.path.join(
-                os.path.dirname(tools.ffmpeg), _exe_names("ffprobe")[0]
-            )
-            if os.path.isfile(sibling) and _probe_version(sibling):
-                tools.ffprobe = sibling
+        sibling = os.path.join(os.path.dirname(tools.ffmpeg), _exe_names("ffprobe")[0])
+        if os.path.isfile(sibling) and _probe_version(sibling):
+            tools.ffprobe = sibling
     if tools.ffprobe is None:
         on_path = shutil.which("ffprobe")
         if on_path and _probe_version(on_path):
@@ -147,6 +146,8 @@ def detect(configured_ffmpeg: str = "", configured_ffprobe: str = "") -> FfmpegT
 
     log.info(
         "FFmpeg detection: ffmpeg=%s (%s) ffprobe=%s",
-        tools.ffmpeg, tools.source, tools.ffprobe,
+        tools.ffmpeg,
+        tools.source,
+        tools.ffprobe,
     )
     return tools

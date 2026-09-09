@@ -1,5 +1,6 @@
 """A single file inside a duplicate group: thumbnail, details, keep-checkbox
 and per-file actions."""
+
 from __future__ import annotations
 
 import os
@@ -27,8 +28,8 @@ _THUMB_EDGE = 260
 
 class FileCard(QFrame):
     decision_changed = Signal()
-    zoom_requested = Signal(object)      # FileRecord - open the full-res viewer
-    delete_requested = Signal(object)    # FileRecord - delete this single file now
+    zoom_requested = Signal(object)  # FileRecord - open the full-res viewer
+    delete_requested = Signal(object)  # FileRecord - delete this single file now
 
     def __init__(self, record: FileRecord, recommended: bool = False, parent=None) -> None:
         super().__init__(parent)
@@ -106,8 +107,11 @@ class FileCard(QFrame):
     # ------------------------------------------------------------------
     def _load_thumb(self) -> None:
         request_thumbnail(
-            self.record.path, self.record.size, self.record.mtime,
-            _THUMB_EDGE - 8, self._on_thumb,
+            self.record.path,
+            self.record.size,
+            self.record.mtime,
+            _THUMB_EDGE - 8,
+            self._on_thumb,
         )
 
     def _on_thumb(self, path: str, pixmap: object) -> None:
@@ -135,9 +139,13 @@ class FileCard(QFrame):
             else:
                 w, h = info.oriented_size
                 lines.append(f"<b>Resolución:</b> {w} × {h}  ({info.megapixels:.1f} MP)")
-                lines.append(f"<b>Formato:</b> {info.format or '-'}   <b>Modo:</b> {info.mode or '-'}")
+                lines.append(
+                    f"<b>Formato:</b> {info.format or '-'}   <b>Modo:</b> {info.mode or '-'}"
+                )
                 if info.orientation != 1:
-                    lines.append(f"<b>Orientación EXIF:</b> {info.orientation} (normalizada en la vista)")
+                    lines.append(
+                        f"<b>Orientación EXIF:</b> {info.orientation} (normalizada en la vista)"
+                    )
                 if info.camera_make or info.camera_model:
                     lines.append(f"<b>Cámara:</b> {info.camera_make} {info.camera_model}".strip())
                 if info.date_taken:
@@ -158,9 +166,7 @@ class FileCard(QFrame):
                     f"<b>FPS:</b> {v.fps or '-'}   "
                     f"<b>Bitrate:</b> {v.bitrate // 1000 if v.bitrate else '-'} kb/s"
                 )
-                lines.append(
-                    f"<b>Audio:</b> {v.audio_codec if v.has_audio else 'sin audio'}"
-                )
+                lines.append(f"<b>Audio:</b> {v.audio_codec if v.has_audio else 'sin audio'}")
                 if v.creation_time:
                     lines.append(f"<b>Creado (metadatos):</b> {v.creation_time}")
                 if rec.frame_hashes:
@@ -174,9 +180,7 @@ class FileCard(QFrame):
                 f"<b>Similitud vs. referencia del grupo:</b> {rec.similarity_percent:.1f}%"
             )
         if rec.sha256:
-            lines.append(
-                f"<b>SHA-256:</b> <span style='font-family:monospace'>{rec.sha256}</span>"
-            )
+            lines.append(f"<b>SHA-256:</b> <span style='font-family:monospace'>{rec.sha256}</span>")
         if rec.pixel_digest:
             lines.append(
                 "<b>Hash de píxeles:</b> "
@@ -209,7 +213,7 @@ class FileCard(QFrame):
     def _set_status(self, text: str, object_name: str, card_border: str = "") -> None:
         self._status.setText(text)
         self._status.setObjectName(object_name)
-        self._status.setStyleSheet("")            # let the theme's #… rule apply
+        self._status.setStyleSheet("")  # let the theme's #… rule apply
         self._status.style().unpolish(self._status)
         self._status.style().polish(self._status)
         self.setStyleSheet(card_border)
@@ -218,18 +222,23 @@ class FileCard(QFrame):
         if self.record.deleted:
             self._set_status(
                 "🗑 ELIMINADO (movido a la papelera / eliminado)",
-                "StatusDelete", "#Card { border: 2px solid #dc2626; }",
+                "StatusDelete",
+                "#Card { border: 2px solid #dc2626; }",
             )
             self.keep_checkbox.setEnabled(False)
             self.setEnabled(False)
             return
         d = self.record.decision
         if d is Decision.KEEP:
-            self._set_status("✔ Se conservará", "StatusKeep",
-                             "#Card { border: 2px solid #16a34a; }")
+            self._set_status(
+                "✔ Se conservará", "StatusKeep", "#Card { border: 2px solid #16a34a; }"
+            )
         elif d is Decision.DELETE:
-            self._set_status("🗑 Marcado para eliminar (no se borra nada todavía)",
-                             "StatusDelete", "#Card { border: 2px solid #dc2626; }")
+            self._set_status(
+                "🗑 Marcado para eliminar (no se borra nada todavía)",
+                "StatusDelete",
+                "#Card { border: 2px solid #dc2626; }",
+            )
         else:
             self._set_status("Sin decidir", "Muted", "")
 
@@ -259,7 +268,8 @@ class FileCard(QFrame):
         menu.addAction("Marcar para eliminar", lambda: self.set_decision(Decision.DELETE))
         menu.addAction("Quitar decisión", lambda: self.set_decision(Decision.UNDECIDED))
         menu.addSeparator()
-        act_del = menu.addAction("🗑 Eliminar este archivo…",
-                                 lambda: self.delete_requested.emit(self.record))
+        act_del = menu.addAction(
+            "🗑 Eliminar este archivo…", lambda: self.delete_requested.emit(self.record)
+        )
         act_del.setEnabled(not self.record.deleted)
         menu.exec(self.mapToGlobal(pos))

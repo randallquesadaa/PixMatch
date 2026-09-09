@@ -7,13 +7,13 @@ to my files" from Settings -> Historial.
 Stored in its own SQLite file (not the analysis cache) so clearing the cache
 never wipes the audit trail.
 """
+
 from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from app.utils.logging_setup import get_logger
 from app.utils.paths import data_dir
@@ -42,13 +42,13 @@ class OperationEntry:
     path: str
     action: str
     result: str
-    detail: Optional[str] = None
-    size: Optional[int] = None
-    group_id: Optional[int] = None
-    category: Optional[str] = None
+    detail: str | None = None
+    size: int | None = None
+    group_id: int | None = None
+    category: str | None = None
 
     @staticmethod
-    def now(**kw) -> "OperationEntry":
+    def now(**kw) -> OperationEntry:
         return OperationEntry(ts=datetime.now().isoformat(timespec="seconds"), **kw)
 
 
@@ -77,8 +77,16 @@ class OperationHistory:
             self._conn.execute(
                 "INSERT INTO operations (ts, path, action, result, detail, size, group_id, category) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (entry.ts, entry.path, entry.action, entry.result, entry.detail,
-                 entry.size, entry.group_id, entry.category),
+                (
+                    entry.ts,
+                    entry.path,
+                    entry.action,
+                    entry.result,
+                    entry.detail,
+                    entry.size,
+                    entry.group_id,
+                    entry.category,
+                ),
             )
             self._conn.commit()
         except sqlite3.Error as exc:
@@ -97,7 +105,7 @@ class OperationHistory:
                 "FROM operations ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-            return [OperationEntry(**{k: r[k] for k in r.keys()}) for r in rows]
+            return [OperationEntry(**dict(r)) for r in rows]
         except sqlite3.Error:
             return []
 

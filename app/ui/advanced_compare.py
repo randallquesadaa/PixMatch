@@ -8,9 +8,10 @@ Modes:
 
 Read-only. Nothing is written to disk.
 """
+
 from __future__ import annotations
 
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageOps
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
@@ -26,9 +27,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.core.duplicate_groups import FileRecord
 from app.core.image_analyzer import difference_image
 from app.core.perceptual import hamming, perceptual_hash, similarity_percent
-from app.core.duplicate_groups import FileRecord
 from app.utils.file_utils import human_size
 
 _MAX_EDGE = 1400
@@ -41,7 +42,7 @@ def _load_rgb(path: str, max_edge: int = _MAX_EDGE) -> Image.Image | None:
             if max(im.size) > max_edge:
                 im.thumbnail((max_edge, max_edge), Image.LANCZOS)
             return im
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -71,7 +72,7 @@ class _Canvas(QLabel):
         self.setText("")
         self.setPixmap(self._pm.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
-    def resizeEvent(self, e):  # noqa: N802
+    def resizeEvent(self, e):
         super().resizeEvent(e)
         self._render()
 
@@ -99,8 +100,10 @@ class AdvancedCompareDialog(QDialog):
         mode_row = QHBoxLayout()
         self._modes = {}
         for key, text in [
-            ("normal", "Normal"), ("side", "Lado a lado"),
-            ("diff", "Diferencia"), ("overlay", "Superposición"),
+            ("normal", "Normal"),
+            ("side", "Lado a lado"),
+            ("diff", "Diferencia"),
+            ("overlay", "Superposición"),
         ]:
             btn = QPushButton(text)
             btn.setCheckable(True)
@@ -205,7 +208,7 @@ class AdvancedCompareDialog(QDialog):
             return
         if a.size != b.size:
             b = b.resize(a.size, Image.LANCZOS)
-        alpha = self.opacity.value() / 100.0   # 0 -> all A, 1 -> all B
+        alpha = self.opacity.value() / 100.0  # 0 -> all A, 1 -> all B
         blended = Image.blend(a, b, alpha)
         self.opacity_label.setText(f"A {100 - self.opacity.value()}% / B {self.opacity.value()}%")
         self.canvas_a.show_pixmap(_pil_to_pixmap(blended))
@@ -218,11 +221,14 @@ class AdvancedCompareDialog(QDialog):
         if same:
             lines.append("A y B son el mismo archivo.")
         else:
-            lines.append(f"B: {rb.name} — {human_size(rb.size)}"
-                         + (f" — {resb[0]}×{resb[1]}" if resb else ""))
+            lines.append(
+                f"B: {rb.name} — {human_size(rb.size)}"
+                + (f" — {resb[0]}×{resb[1]}" if resb else "")
+            )
             ha, hb = perceptual_hash(ra.path), perceptual_hash(rb.path)
             if ha is not None and hb is not None:
                 d = hamming(ha, hb)
-                lines.append(f"Similitud perceptual ≈ {similarity_percent(d):.1f}% "
-                             f"(distancia {d}/64)")
+                lines.append(
+                    f"Similitud perceptual ≈ {similarity_percent(d):.1f}% (distancia {d}/64)"
+                )
         self.readout.setText("\n".join(lines))

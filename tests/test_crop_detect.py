@@ -9,8 +9,7 @@ def _scene(path, size=(800, 600)):
     img = Image.new("RGB", size, (25, 45, 90))
     d = ImageDraw.Draw(img)
     for i in range(20):
-        d.ellipse([i * 30, i * 22, i * 30 + 90, i * 22 + 90],
-                  fill=(200 - i * 8, 40 + i * 9, 110))
+        d.ellipse([i * 30, i * 22, i * 30 + 90, i * 22 + 90], fill=(200 - i * 8, 40 + i * 9, 110))
     d.rectangle([120, 100, 360, 420], fill=(235, 210, 35))
     d.polygon([(500, 550), (650, 300), (780, 550)], fill=(90, 200, 130))
     img.save(path)

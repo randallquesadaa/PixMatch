@@ -1,4 +1,5 @@
 """Confirmation dialog before any deletion, plus the operation-history viewer."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -37,7 +38,9 @@ class DeletionConfirmDialog(QDialog):
         headline.setWordWrap(True)
         headline.setStyleSheet("font-size: 15px; font-weight: 600;")
         if n == 1:
-            headline.setText(f"Vas a eliminar 1 archivo y liberar {human_size(preview.total_bytes)}.")
+            headline.setText(
+                f"Vas a eliminar 1 archivo y liberar {human_size(preview.total_bytes)}."
+            )
         else:
             headline.setText(
                 f"Vas a eliminar {n} archivos y liberar aproximadamente "
@@ -102,7 +105,9 @@ class DeletionConfirmDialog(QDialog):
 
         self._buttons = QDialogButtonBox()
         self._cancel = self._buttons.addButton("Cancelar", QDialogButtonBox.RejectRole)
-        self._confirm = self._buttons.addButton("Confirmar eliminación", QDialogButtonBox.AcceptRole)
+        self._confirm = self._buttons.addButton(
+            "Confirmar eliminación", QDialogButtonBox.AcceptRole
+        )
         self._confirm.setObjectName("danger")
         self._cancel.setDefault(True)
         self._buttons.accepted.connect(self._accept)
@@ -115,9 +120,7 @@ class DeletionConfirmDialog(QDialog):
     def _sync_mode_labels(self) -> None:
         permanent = not self.mode_trash.isChecked()
         self._perm_note.setVisible(permanent)
-        self._confirm.setText(
-            "Eliminar permanentemente" if permanent else "Enviar a la papelera"
-        )
+        self._confirm.setText("Eliminar permanentemente" if permanent else "Enviar a la papelera")
 
     def _update_ok(self) -> None:
         ok = True
@@ -140,9 +143,7 @@ class HistoryDialog(QDialog):
         self._history = history
 
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(
-            ["Fecha", "Acción", "Resultado", "Archivo", "Detalle"]
-        )
+        self.table.setHorizontalHeaderLabels(["Fecha", "Acción", "Resultado", "Archivo", "Detalle"])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
 
@@ -167,8 +168,11 @@ class HistoryDialog(QDialog):
     def _load(self) -> None:
         rows = self._history.recent(1000)
         self.table.setRowCount(len(rows))
-        action_es = {"trash": "papelera", "permanent": "eliminación permanente",
-                     "rename": "renombrado"}
+        action_es = {
+            "trash": "papelera",
+            "permanent": "eliminación permanente",
+            "rename": "renombrado",
+        }
         for i, e in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(e.ts))
             self.table.setItem(i, 1, QTableWidgetItem(action_es.get(e.action, e.action)))
@@ -182,9 +186,13 @@ class HistoryDialog(QDialog):
     def _clear(self) -> None:
         from PySide6.QtWidgets import QMessageBox
 
-        if QMessageBox.question(
-            self, "Vaciar historial",
-            "¿Borrar todo el historial de operaciones? Esto no afecta a tus archivos.",
-        ) == QMessageBox.Yes:
+        if (
+            QMessageBox.question(
+                self,
+                "Vaciar historial",
+                "¿Borrar todo el historial de operaciones? Esto no afecta a tus archivos.",
+            )
+            == QMessageBox.Yes
+        ):
             self._history.clear()
             self._load()

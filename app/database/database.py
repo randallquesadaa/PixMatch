@@ -8,25 +8,24 @@ If the database file is missing, unreadable or corrupt, every method degrades
 to a no-op / empty result and logs a warning - the analysis simply runs
 without a cache rather than failing.
 """
+
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from app.database.models import CREATE_SQL, SCHEMA_VERSION, CachedFile
 from app.utils.logging_setup import get_logger
 
 log = get_logger(__name__)
 
-_INSERT_SQL = (
-    "INSERT INTO file_cache (%s) VALUES (%s) "
-    "ON CONFLICT(path) DO UPDATE SET %s"
-    % (
-        ", ".join(CachedFile.fields()),
-        ", ".join("?" for _ in CachedFile.fields()),
-        ", ".join(f"{f}=excluded.{f}" for f in CachedFile.fields() if f != "path"),
-    )
+# SQL below interpolates only hardcoded column names (from CachedFile.fields())
+# and lists of "?" placeholders - every value is always passed as a bound param.
+_INSERT_SQL = "INSERT INTO file_cache (%s) VALUES (%s) ON CONFLICT(path) DO UPDATE SET %s" % (  # nosec B608
+    ", ".join(CachedFile.fields()),
+    ", ".join("?" for _ in CachedFile.fields()),
+    ", ".join(f"{f}=excluded.{f}" for f in CachedFile.fields() if f != "path"),
 )
 
 
@@ -45,9 +44,7 @@ class FileCacheDB:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.executescript(CREATE_SQL)
-            row = self._conn.execute(
-                "SELECT value FROM meta WHERE key='schema_version'"
-            ).fetchone()
+            row = self._conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
             if row is None:
                 self._conn.execute(
                     "INSERT INTO meta(key, value) VALUES ('schema_version', ?)",
@@ -56,7 +53,8 @@ class FileCacheDB:
             elif int(row["value"]) != SCHEMA_VERSION:
                 log.warning(
                     "Cache schema %s != %s - rebuilding cache.",
-                    row["value"], SCHEMA_VERSION,
+                    row["value"],
+                    SCHEMA_VERSION,
                 )
                 self._conn.execute("DROP TABLE IF EXISTS file_cache")
                 self._conn.executescript(CREATE_SQL)
@@ -82,12 +80,12 @@ class FileCacheDB:
         try:
             cur = self._conn.cursor()
             for chunk_start in range(0, len(paths), 400):
-                chunk = paths[chunk_start:chunk_start + 400]
-                q = "SELECT * FROM file_cache WHERE path IN (%s)" % ",".join(
+                chunk = paths[chunk_start : chunk_start + 400]
+                q = "SELECT * FROM file_cache WHERE path IN (%s)" % ",".join(  # nosec B608
                     "?" for _ in chunk
                 )
                 for row in cur.execute(q, chunk):
-                    out[row["path"]] = CachedFile(**{k: row[k] for k in row.keys()})
+                    out[row["path"]] = CachedFile(**dict(row))
         except sqlite3.Error as exc:
             log.warning("Lectura de caché fallida: %s", exc)
         return out
@@ -110,9 +108,9 @@ class FileCacheDB:
             all_paths = [r[0] for r in self._conn.execute("SELECT path FROM file_cache")]
             gone = [p for p in all_paths if p not in existing]
             for start in range(0, len(gone), 400):
-                chunk = gone[start:start + 400]
+                chunk = gone[start : start + 400]
                 self._conn.execute(
-                    "DELETE FROM file_cache WHERE path IN (%s)"
+                    "DELETE FROM file_cache WHERE path IN (%s)"  # nosec B608
                     % ",".join("?" for _ in chunk),
                     chunk,
                 )

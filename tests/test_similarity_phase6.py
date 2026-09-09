@@ -1,4 +1,5 @@
 """End-to-end intelligent similarity (req. 49-63)."""
+
 from __future__ import annotations
 
 import shutil
@@ -12,8 +13,13 @@ from app.core.similarity import MatchCategory
 
 
 def _cfg(**kw):
-    c = AppConfig(analyze_images=True, analyze_similar_images=True,
-                  use_cache=False, workers=3, sensitivity="medium")
+    c = AppConfig(
+        analyze_images=True,
+        analyze_similar_images=True,
+        use_cache=False,
+        workers=3,
+        sensitivity="medium",
+    )
     for k, v in kw.items():
         setattr(c, k, v)
     return c
@@ -44,7 +50,7 @@ def test_no_false_positive_similar_palette(tmp_path):
     b.save(tmp_path / "sunset_b.jpg", quality=90)
 
     result = run_analysis(str(tmp_path), _cfg(sensitivity="high"))
-    assert result.groups == []          # similar colours, different scenes
+    assert result.groups == []  # similar colours, different scenes
 
 
 # -- req. 53: RESIZED DUPLICATE --------------------------------------
@@ -85,8 +91,10 @@ def test_brightness_and_blur_still_similar(tmp_path):
     groups = run_analysis(str(tmp_path), _cfg(sensitivity="high")).groups
     assert len(groups) == 1
     assert groups[0].category in (
-        MatchCategory.VISUALLY_IDENTICAL, MatchCategory.RESIZED_DUPLICATE,
-        MatchCategory.VERY_SIMILAR, MatchCategory.SIMILAR,
+        MatchCategory.VISUALLY_IDENTICAL,
+        MatchCategory.RESIZED_DUPLICATE,
+        MatchCategory.VERY_SIMILAR,
+        MatchCategory.SIMILAR,
     )
     assert groups[0].match_reasons
 
@@ -106,12 +114,12 @@ def test_sensitivity_low_is_stricter(tmp_path):
 # -- req. 62: every group carries a specific label + confidence ---
 def test_groups_have_specific_labels_and_confidence(tmp_path):
     a = _photo(tmp_path / "a.png")
-    shutil.copy2(a, tmp_path / "a_copy.png")            # FILE_IDENTICAL
+    shutil.copy2(a, tmp_path / "a_copy.png")  # FILE_IDENTICAL
     Image.open(a).resize((500, 375)).save(tmp_path / "a_small.jpg", quality=80)  # RESIZED
     result = run_analysis(str(tmp_path), _cfg())
     for g in result.groups:
         assert g.category is not MatchCategory.DIFFERENT
-        assert g.category.style.short_es          # a real label, never just "DUPLICATE"
+        assert g.category.style.short_es  # a real label, never just "DUPLICATE"
         assert 0 < g.confidence <= 100
     assert any(g.category is MatchCategory.FILE_IDENTICAL for g in result.groups)
 
@@ -130,4 +138,4 @@ def test_ai_flag_without_backend_is_harmless(tmp_path):
     a = _photo(tmp_path / "a.png")
     shutil.copy2(a, tmp_path / "a_copy.png")
     result = run_analysis(str(tmp_path), _cfg(use_ai_embeddings=True))
-    assert result.groups        # still works via traditional methods
+    assert result.groups  # still works via traditional methods

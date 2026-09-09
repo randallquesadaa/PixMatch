@@ -7,6 +7,7 @@
 * The disk cache key includes the file's path, size and mtime, so a changed
   file transparently regenerates its thumbnail.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +15,6 @@ import io
 import os
 import threading
 from collections import OrderedDict
-from typing import Optional
 
 from PIL import Image, ImageOps
 
@@ -40,7 +40,7 @@ def _video_tools():
 class ThumbnailCache:
     def __init__(self, max_edge: int = 320, mem_items: int = 400) -> None:
         self.max_edge = max_edge
-        self._mem: "OrderedDict[str, bytes]" = OrderedDict()
+        self._mem: OrderedDict[str, bytes] = OrderedDict()
         self._mem_items = mem_items
         self._lock = threading.Lock()
         self._dir = thumbnail_cache_dir()
@@ -48,7 +48,8 @@ class ThumbnailCache:
     # ------------------------------------------------------------------
     def _key(self, path: str, size: int, mtime: float) -> str:
         raw = f"{os.path.abspath(path)}|{size}|{int(mtime)}|{self.max_edge}"
-        return hashlib.sha1(raw.encode("utf-8", "replace")).hexdigest()
+        # Not a security hash - just a short, stable filename for the disk cache.
+        return hashlib.sha1(raw.encode("utf-8", "replace"), usedforsecurity=False).hexdigest()
 
     def _disk_path(self, key: str) -> str:
         sub = self._dir / key[:2]
@@ -56,7 +57,7 @@ class ThumbnailCache:
         return str(sub / f"{key}.png")
 
     # ------------------------------------------------------------------
-    def get_png(self, path: str, size: int, mtime: float) -> Optional[bytes]:
+    def get_png(self, path: str, size: int, mtime: float) -> bytes | None:
         """Return PNG bytes for a thumbnail, or ``None`` if the image is
         unreadable. Safe to call from any thread."""
         key = self._key(path, size, mtime)
@@ -98,7 +99,7 @@ class ThumbnailCache:
             while len(self._mem) > self._mem_items:
                 self._mem.popitem(last=False)
 
-    def _render(self, path: str) -> Optional[bytes]:
+    def _render(self, path: str) -> bytes | None:
         import os
 
         from app.core.scanner import VIDEO_EXTENSIONS
@@ -114,19 +115,17 @@ class ThumbnailCache:
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 return buf.getvalue()
-        except Exception as exc:  # noqa: BLE001 - corrupt/unknown files
+        except Exception as exc:
             log.debug("Thumbnail failed for %s: %s", path, exc)
             return None
 
-    def _render_video_frame(self, path: str) -> Optional[bytes]:
+    def _render_video_frame(self, path: str) -> bytes | None:
         tools = _video_tools()
         if not tools.available:
             return None
         from app.core.video_analyzer import _grab_frame_png
 
-        png = _grab_frame_png(path, tools.ffmpeg, 1.0) or _grab_frame_png(
-            path, tools.ffmpeg, 0.0
-        )
+        png = _grab_frame_png(path, tools.ffmpeg, 1.0) or _grab_frame_png(path, tools.ffmpeg, 0.0)
         if not png:
             return None
         try:
@@ -136,7 +135,7 @@ class ThumbnailCache:
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 return buf.getvalue()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.debug("Video thumbnail failed for %s: %s", path, exc)
             return None
 

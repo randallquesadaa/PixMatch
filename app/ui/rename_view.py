@@ -4,6 +4,7 @@ Scans a folder (and subfolders), proposes a date-based name for every photo /
 video, and renames only what the user confirms. Files stay in their folder -
 only the name changes - and every rename is logged and undoable.
 """
+
 from __future__ import annotations
 
 import os
@@ -190,7 +191,8 @@ class RenameView(QWidget):
     # -- preview --------------------------------------------------
     def _persist_options(self) -> None:
         self.config.rename_pattern = (
-            self.pattern_combo.currentData() or self.pattern_combo.currentText().strip()
+            self.pattern_combo.currentData()
+            or self.pattern_combo.currentText().strip()
             or "%Y%m%d_%H%M%S"
         )
         self.config.rename_prefix = self.prefix_edit.text().strip()
@@ -236,8 +238,7 @@ class RenameView(QWidget):
         self.progress.setVisible(running)
         self.scan_btn.setEnabled(not running and os.path.isdir(self._folder))
         self.cancel_btn.setEnabled(running)
-        for w in (self.pattern_combo, self.prefix_edit, self.videos_check,
-                  self.lower_check):
+        for w in (self.pattern_combo, self.prefix_edit, self.videos_check, self.lower_check):
             w.setEnabled(not running)
         if not running:
             self.progress_label.setText("")
@@ -250,8 +251,9 @@ class RenameView(QWidget):
     # -- table ----------------------------------------------------
     def _visible_plans(self) -> list[RenamePlan]:
         if self.only_changes.isChecked():
-            return [p for p in self._plans
-                    if p.status in (RenameStatus.RENAME, RenameStatus.SUFFIXED)]
+            return [
+                p for p in self._plans if p.status in (RenameStatus.RENAME, RenameStatus.SUFFIXED)
+            ]
         return list(self._plans)
 
     def _repopulate_table(self) -> None:
@@ -277,8 +279,9 @@ class RenameView(QWidget):
             self.table.setItem(row, 3, new_item)
             ts = p.timestamp.strftime("%Y-%m-%d %H:%M:%S") if p.timestamp else "—"
             self.table.setItem(row, 4, QTableWidgetItem(ts))
-            src = QTableWidgetItem(p.source.label if p.status is not RenameStatus.ERROR
-                                   else (p.error or "error"))
+            src = QTableWidgetItem(
+                p.source.label if p.status is not RenameStatus.ERROR else (p.error or "error")
+            )
             if not p.source.is_metadata and p.status is not RenameStatus.ERROR:
                 src.setToolTip("Sin fecha en los metadatos; se usa la fecha de modificación")
             self.table.setItem(row, 5, src)
@@ -390,9 +393,12 @@ class RenameView(QWidget):
         if self.busy or self._last_report is None:
             return
         n = len(self._last_report.succeeded)
-        if QMessageBox.question(
-            self, "Deshacer", f"¿Devolver {n} archivo(s) a su nombre anterior?"
-        ) != QMessageBox.Yes:
+        if (
+            QMessageBox.question(
+                self, "Deshacer", f"¿Devolver {n} archivo(s) a su nombre anterior?"
+            )
+            != QMessageBox.Yes
+        ):
             return
         self._set_running(True)
         self.progress.setRange(0, 0)

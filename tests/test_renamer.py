@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
-import pytest
 from PIL import Image
 
 from app.core.renamer import (
@@ -31,9 +30,9 @@ def _jpeg(path, dt: datetime | None = None, size=(20, 16)):
     img = Image.new("RGB", size, (10, 120, 200))
     if dt is not None:
         exif = img.getexif()
-        exif[0x0132] = dt.strftime("%Y:%m:%d %H:%M:%S")           # DateTime
+        exif[0x0132] = dt.strftime("%Y:%m:%d %H:%M:%S")  # DateTime
         sub = exif.get_ifd(0x8769)
-        sub[0x9003] = dt.strftime("%Y:%m:%d %H:%M:%S")            # DateTimeOriginal
+        sub[0x9003] = dt.strftime("%Y:%m:%d %H:%M:%S")  # DateTimeOriginal
         img.save(path, exif=exif)
     else:
         img.save(path)
@@ -60,8 +59,7 @@ def test_falls_back_to_mtime(tmp_path):
 def test_plan_names_and_unchanged(tmp_path):
     _jpeg(tmp_path / "DSC01.jpg", datetime(2022, 12, 2, 14, 30, 5))
     _jpeg(tmp_path / "20230101_090000.jpg", datetime(2023, 1, 1, 9, 0, 0))
-    plans = build_rename_plan([_F(tmp_path / "DSC01.jpg"),
-                               _F(tmp_path / "20230101_090000.jpg")])
+    plans = build_rename_plan([_F(tmp_path / "DSC01.jpg"), _F(tmp_path / "20230101_090000.jpg")])
     by_old = {p.old_name: p for p in plans}
     assert by_old["DSC01.jpg"].new_name == "20221202_143005.jpg"
     assert by_old["DSC01.jpg"].status is RenameStatus.RENAME
@@ -79,7 +77,7 @@ def test_conflict_gets_suffix(tmp_path):
 
 
 def test_conflict_with_existing_file_on_disk(tmp_path):
-    _jpeg(tmp_path / "20221202_143005.jpg")   # already there, not in the plan
+    _jpeg(tmp_path / "20221202_143005.jpg")  # already there, not in the plan
     _jpeg(tmp_path / "raw.jpg", datetime(2022, 12, 2, 14, 30, 5))
     plans = build_rename_plan([_F(tmp_path / "raw.jpg")])
     assert plans[0].new_name == "20221202_143005_2.jpg"
@@ -102,8 +100,7 @@ def test_subfolders_number_independently(tmp_path):
     (tmp_path / "d2").mkdir()
     _jpeg(tmp_path / "d1" / "a.jpg", datetime(2022, 1, 1, 0, 0, 0))
     _jpeg(tmp_path / "d2" / "b.jpg", datetime(2022, 1, 1, 0, 0, 0))
-    plans = build_rename_plan([_F(tmp_path / "d1" / "a.jpg"),
-                               _F(tmp_path / "d2" / "b.jpg")])
+    plans = build_rename_plan([_F(tmp_path / "d1" / "a.jpg"), _F(tmp_path / "d2" / "b.jpg")])
     # same target name is fine - different directories
     assert all(p.new_name == "20220101_000000.jpg" for p in plans)
 
@@ -121,10 +118,12 @@ def test_apply_renames_on_disk(tmp_path):
 def test_apply_handles_a_swap(tmp_path):
     _jpeg(tmp_path / "20220102_000000.jpg", datetime(2022, 1, 1, 0, 0, 0))
     _jpeg(tmp_path / "20220101_000000.jpg", datetime(2022, 1, 2, 0, 0, 0))
-    plans = build_rename_plan([
-        _F(tmp_path / "20220102_000000.jpg"),
-        _F(tmp_path / "20220101_000000.jpg"),
-    ])
+    plans = build_rename_plan(
+        [
+            _F(tmp_path / "20220102_000000.jpg"),
+            _F(tmp_path / "20220101_000000.jpg"),
+        ]
+    )
     report = apply_renames(plans)
     assert len(report.succeeded) == 2 and not report.failed
     a = Image.open(tmp_path / "20220101_000000.jpg").getexif().get_ifd(0x8769)[0x9003]
@@ -138,14 +137,17 @@ def test_apply_never_overwrites(tmp_path):
     from app.core.renamer import RenamePlan
 
     p = RenamePlan(
-        path=str(tmp_path / "raw.jpg"), directory=str(tmp_path),
-        old_name="raw.jpg", new_name="20221202_143005.jpg",
-        source=DateSource.EXIF_ORIGINAL, timestamp=datetime(2022, 12, 2, 14, 30, 5),
+        path=str(tmp_path / "raw.jpg"),
+        directory=str(tmp_path),
+        old_name="raw.jpg",
+        new_name="20221202_143005.jpg",
+        source=DateSource.EXIF_ORIGINAL,
+        timestamp=datetime(2022, 12, 2, 14, 30, 5),
         status=RenameStatus.RENAME,
     )
     report = apply_renames([p])
     assert report.failed
-    assert (tmp_path / "raw.jpg").exists()   # rolled back
+    assert (tmp_path / "raw.jpg").exists()  # rolled back
     assert Image.open(tmp_path / "20221202_143005.jpg").getexif()  # untouched
 
 

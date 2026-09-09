@@ -51,9 +51,9 @@ def test_html_is_self_contained_and_escaped(tmp_path, make_image):
 
     assert text.startswith("<!doctype html>")
     assert "MARCADO PARA ELIMINAR" in text
-    assert "IMG &lt;1&gt;.jpg" in text          # angle brackets escaped
-    assert "<IMG <1>" not in text               # never raw
-    assert "data:image/png;base64," in text     # thumbnails embedded
+    assert "IMG &lt;1&gt;.jpg" in text  # angle brackets escaped
+    assert "<IMG <1>" not in text  # never raw
+    assert "data:image/png;base64," in text  # thumbnails embedded
 
 
 def test_html_skips_thumbnails_when_huge(tmp_path, make_image, monkeypatch):

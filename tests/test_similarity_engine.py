@@ -3,8 +3,8 @@ from __future__ import annotations
 from app.core.similarity import MatchCategory
 from app.core.similarity_engine import (
     DEFAULT_WEIGHTS,
-    SimilarityBands,
     Signals,
+    SimilarityBands,
     classify_combined,
     combined_score,
     resolve_profile,
@@ -25,8 +25,15 @@ class _Cfg:
 
 def _sig(base=0, w=1000, h=800):
     # a valid histogram signature sums to ~1000
-    return Signals(phash=base, dhash=base, ahash=base, bhash=base,
-                   color_sig="1000" + ",0" * 63, width=w, height=h)
+    return Signals(
+        phash=base,
+        dhash=base,
+        ahash=base,
+        bhash=base,
+        color_sig="1000" + ",0" * 63,
+        width=w,
+        height=h,
+    )
 
 
 def test_identical_signals_score_100():
@@ -41,9 +48,10 @@ def test_weights_are_normalised_and_respected():
     a = Signals(phash=0, dhash=0, ahash=0, bhash=0, color_sig="1", width=10, height=10)
     b = Signals(phash=(1 << 64) - 1, dhash=0, ahash=0, bhash=0, color_sig="1", width=10, height=10)
     default = combined_score(a, b).score
-    phash_heavy = combined_score(a, b, weights={"phash": 1.0, "dhash": 0, "ahash": 0,
-                                                "color": 0, "bhash": 0}).score
-    assert phash_heavy < default        # weighting phash pulls the score down
+    phash_heavy = combined_score(
+        a, b, weights={"phash": 1.0, "dhash": 0, "ahash": 0, "color": 0, "bhash": 0}
+    ).score
+    assert phash_heavy < default  # weighting phash pulls the score down
 
 
 def test_resize_upgrade():
@@ -68,15 +76,17 @@ def test_classify_bands():
 def test_sensitivity_presets():
     low = resolve_profile(_Cfg(sensitivity="low"))
     high = resolve_profile(_Cfg(sensitivity="high"))
-    assert low.bands.similar > high.bands.similar     # low = stricter
+    assert low.bands.similar > high.bands.similar  # low = stricter
     assert high.detect_crops and not low.detect_crops
 
 
 def test_custom_profile_reads_config():
-    cfg = _Cfg(sensitivity="custom",
-               similarity_bands={"visually_identical": 95, "very_similar": 80, "similar": 60},
-               similarity_weights={"phash": 0.5, "dhash": 0.5, "ahash": 0, "color": 0, "bhash": 0},
-               detect_crops=True)
+    cfg = _Cfg(
+        sensitivity="custom",
+        similarity_bands={"visually_identical": 95, "very_similar": 80, "similar": 60},
+        similarity_weights={"phash": 0.5, "dhash": 0.5, "ahash": 0, "color": 0, "bhash": 0},
+        detect_crops=True,
+    )
     p = resolve_profile(cfg)
     assert p.bands.similar == 60.0
     assert p.detect_crops

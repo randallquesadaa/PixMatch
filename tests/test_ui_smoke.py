@@ -3,6 +3,7 @@
 These do not drive a real event loop - they just make sure the widgets can be
 constructed and populated with a real AnalysisResult without raising.
 """
+
 from __future__ import annotations
 
 import os
@@ -14,10 +15,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication
 
-from app.config import AppConfig  # noqa: E402
-from app.core.analysis import run_analysis  # noqa: E402
+from app.config import AppConfig
+from app.core.analysis import run_analysis
 
 
 @pytest.fixture(scope="module")
@@ -31,7 +32,7 @@ def test_main_window_constructs(qapp):
 
     win = MainWindow(AppConfig())
     assert win.windowTitle().startswith("PixMatch")
-    assert win.tabs.count() == 2                       # Duplicados + Renombrar
+    assert win.tabs.count() == 2  # Duplicados + Renombrar
     win.close()
 
 
@@ -51,7 +52,7 @@ def test_rename_view_preview_and_apply(qapp, tmp_path):
         img.save(p, exif=exif)
 
     jpeg("DSC1.jpg", datetime(2022, 12, 2, 14, 30, 5))
-    jpeg("DSC2.jpg", datetime(2022, 12, 2, 14, 30, 5))   # same second -> suffix
+    jpeg("DSC2.jpg", datetime(2022, 12, 2, 14, 30, 5))  # same second -> suffix
 
     hist = OperationHistory(tmp_path / "h.sqlite3")
     view = RenameView(AppConfig(use_cache=False), hist)
@@ -64,6 +65,7 @@ def test_rename_view_preview_and_apply(qapp, tmp_path):
     class F:
         def __init__(self, p):
             import os
+
             self.path = str(p)
             self.kind = FileKind.IMAGE
             self.mtime = os.stat(p).st_mtime
@@ -95,11 +97,11 @@ def test_duplicate_view_loads_result(qapp, tmp_path, make_image):
     view._show(0)
 
     # group-action buttons reflect what is actually possible
-    assert not view.keep_sel_btn.isEnabled()      # nothing selected yet
-    assert not view.clear_btn.isEnabled()         # no decisions yet
+    assert not view.keep_sel_btn.isEnabled()  # nothing selected yet
+    assert not view.clear_btn.isEnabled()  # no decisions yet
     assert view.keep_all_btn.isEnabled()
     view._cards[0].keep_checkbox.setChecked(True)
-    assert view.keep_sel_btn.isEnabled()          # partial selection
+    assert view.keep_sel_btn.isEnabled()  # partial selection
     assert view.del_unsel_btn.isEnabled()
 
     view.keep_all()
@@ -129,15 +131,17 @@ def test_similar_group_and_advanced_compare(qapp, tmp_path):
     assert result.similar_groups
     group = result.similar_groups[0]
     assert group.category in (
-        MatchCategory.RESIZED_DUPLICATE, MatchCategory.VISUALLY_IDENTICAL,
-        MatchCategory.VERY_SIMILAR, MatchCategory.SIMILAR,
+        MatchCategory.RESIZED_DUPLICATE,
+        MatchCategory.VISUALLY_IDENTICAL,
+        MatchCategory.VERY_SIMILAR,
+        MatchCategory.SIMILAR,
     )
 
     view = DuplicateView()
     view.load(result)
     view.filter_combo.setCurrentText("Similares")
     assert view.group_list.count() >= 1
-    assert not view.advanced_btn.isHidden()   # shown for a similar group
+    assert not view.advanced_btn.isHidden()  # shown for a similar group
 
     dlg = AdvancedCompareDialog(group.records)
     dlg._refresh()
@@ -175,10 +179,13 @@ def test_image_viewer_navigation_and_pending_delete(qapp, tmp_path, make_image):
     from app.core.scanner import FileKind
     from app.ui.image_viewer import ImageViewerDialog
 
-    paths = [make_image(tmp_path / f"v{i}.png", size=(40, 30), color=(i * 40, 0, 0))
-             for i in range(3)]
-    recs = [FileRecord(path=str(p), size=p.stat().st_size, mtime=1.0, kind=FileKind.IMAGE)
-            for p in paths]
+    paths = [
+        make_image(tmp_path / f"v{i}.png", size=(40, 30), color=(i * 40, 0, 0)) for i in range(3)
+    ]
+    recs = [
+        FileRecord(path=str(p), size=p.stat().st_size, mtime=1.0, kind=FileKind.IMAGE)
+        for p in paths
+    ]
 
     dlg = ImageViewerDialog(recs, 0)
     assert dlg._counter.text() == "1 / 3"
@@ -240,7 +247,7 @@ def test_deletion_flow_marks_group_resolved(qapp, tmp_path, make_image):
 
     view.after_deletion()
     assert result.groups[0].is_resolved
-    assert view.group_list.count() == 0        # resolved group hidden by default
+    assert view.group_list.count() == 0  # resolved group hidden by default
     view.filter_combo.setCurrentText("Resueltos")
     assert view.group_list.count() == 1
     hist.close()

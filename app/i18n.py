@@ -9,6 +9,7 @@ Switching language at runtime updates dynamically-built text immediately;
 static widget labels created once take effect on the next launch (the Settings
 dialog says so).
 """
+
 from __future__ import annotations
 
 _lang = "es"
@@ -36,11 +37,9 @@ _EN: dict[str, str] = {
     "Ninguna carpeta seleccionada": "No folder selected",
     # --- welcome ---
     "Herramienta de solo lectura para encontrar imágenes y videos duplicados.\n"
-    "Nunca se borra ni se modifica nada sin tu confirmación explícita.":
-        "Read-only tool to find duplicate images and videos.\n"
-        "Nothing is ever deleted or modified without your explicit confirmation.",
-    "⬇  Arrastra una carpeta aquí para comenzar":
-        "⬇  Drop a folder here to start",
+    "Nunca se borra ni se modifica nada sin tu confirmación explícita.": "Read-only tool to find duplicate images and videos.\n"
+    "Nothing is ever deleted or modified without your explicit confirmation.",
+    "⬇  Arrastra una carpeta aquí para comenzar": "⬇  Drop a folder here to start",
     "Seleccionar carpeta": "Choose folder",
     # --- progress ---
     "Analizando…": "Analyzing…",
@@ -123,12 +122,10 @@ _EN: dict[str, str] = {
     "Abrir carpeta": "Open folder",
     "Copiar ruta": "Copy path",
     "Sin decidir": "Undecided",
-    "Sin grupos que mostrar con el filtro actual":
-        "No groups match the current filter",
+    "Sin grupos que mostrar con el filtro actual": "No groups match the current filter",
     # --- deletion ---
     "⚠️  Confirmar eliminación": "⚠️  Confirm deletion",
-    "Enviar a la papelera del sistema (recomendado, recuperable)":
-        "Move to the system recycle bin (recommended, recoverable)",
+    "Enviar a la papelera del sistema (recomendado, recuperable)": "Move to the system recycle bin (recommended, recoverable)",
     "Confirmar eliminación": "Confirm deletion",
     "Enviar a la papelera": "Move to recycle bin",
     "Eliminar permanentemente": "Delete permanently",
@@ -149,11 +146,9 @@ _EN: dict[str, str] = {
     "Guardar": "Save",
     "Comprobar FFmpeg": "Check FFmpeg",
     "Analizar imágenes": "Analyze images",
-    "Analizar vídeos (hash de archivo + comparación de fotogramas, necesita FFmpeg)":
-        "Analyze videos (file hash + frame comparison, needs FFmpeg)",
+    "Analizar vídeos (hash de archivo + comparación de fotogramas, necesita FFmpeg)": "Analyze videos (file hash + frame comparison, needs FFmpeg)",
     "Umbral de similitud": "Similarity threshold",
-    "El idioma se aplica del todo al reiniciar la aplicación.":
-        "The language fully applies after restarting the app.",
+    "El idioma se aplica del todo al reiniciar la aplicación.": "The language fully applies after restarting the app.",
     # --- common buttons / labels ---
     "Cerrar": "Close",
     "Actualizar": "Refresh",

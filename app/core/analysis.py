@@ -15,13 +15,14 @@ again.
 Progress and lifecycle are reported through :class:`AnalysisCallbacks` so the
 module stays independent of the GUI.
 """
+
 from __future__ import annotations
 
 import time
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from typing import Callable, Iterable, Optional
 
 from app.config import AppConfig
 from app.core.duplicate_groups import AnalysisResult, FileRecord, build_groups
@@ -84,7 +85,7 @@ def _parallel(
     emit: Callable[[StepProgress], None],
     label: str,
     started: float,
-    group_count: Optional[Callable[[], int]] = None,
+    group_count: Callable[[], int] | None = None,
 ) -> None:
     total = len(items)
     if total == 0:
@@ -98,11 +99,15 @@ def _parallel(
         now = time.monotonic()
         if force or now - last > 0.15:
             last = now
-            emit(StepProgress(
-                label, done, total,
-                group_count() if group_count else 0,
-                now - started,
-            ))
+            emit(
+                StepProgress(
+                    label,
+                    done,
+                    total,
+                    group_count() if group_count else 0,
+                    now - started,
+                )
+            )
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pending: dict = {}
@@ -120,7 +125,7 @@ def _parallel(
             fill()
 
         while pending:
-            if not controller.checkpoint():   # blocks while paused, False on cancel
+            if not controller.checkpoint():  # blocks while paused, False on cancel
                 break
             finished, _ = wait(pending, timeout=0.2, return_when=FIRST_COMPLETED)
             for fut in finished:
@@ -144,10 +149,10 @@ def _parallel(
 def run_analysis(
     root: str,
     config: AppConfig,
-    controller: Optional[RunController] = None,
-    callbacks: Optional[AnalysisCallbacks] = None,
+    controller: RunController | None = None,
+    callbacks: AnalysisCallbacks | None = None,
     incremental: bool = False,
-    db_path: Optional[str] = None,
+    db_path: str | None = None,
 ) -> AnalysisResult:
     controller = controller or RunController()
     cb = callbacks or AnalysisCallbacks()
@@ -173,9 +178,13 @@ def run_analysis(
 
     if controller.is_cancelled:
         return AnalysisResult(
-            root=root, incremental=incremental, scan_stats=scan_stats,
-            groups=[], hashed_files=0,
-            elapsed_seconds=time.monotonic() - started, cancelled=True,
+            root=root,
+            incremental=incremental,
+            scan_stats=scan_stats,
+            groups=[],
+            hashed_files=0,
+            elapsed_seconds=time.monotonic() - started,
+            cancelled=True,
         )
 
     # -- 2. cache lookup -------------------------------------------
@@ -212,7 +221,10 @@ def run_analysis(
     for sf in collected:
         by_size[sf.size].append(sf)
     sha_candidates = [
-        sf for group in by_size.values() if len(group) > 1 for sf in group
+        sf
+        for group in by_size.values()
+        if len(group) > 1
+        for sf in group
         if records[sf.path].sha256 is None
     ]
     cb.on_message(
@@ -235,10 +247,14 @@ def run_analysis(
             log.warning("Hash failed: %s -> %s", sf.path, exc)
 
     _parallel(
-        sha_candidates, _hash,
-        workers=config.workers, controller=controller,
-        handle=_hash_done, emit=cb.on_step_progress,
-        label="SHA-256", started=started,
+        sha_candidates,
+        _hash,
+        workers=config.workers,
+        controller=controller,
+        handle=_hash_done,
+        emit=cb.on_step_progress,
+        label="SHA-256",
+        started=started,
         group_count=lambda: _rough_hash_groups(records.values()),
     )
 
@@ -249,8 +265,7 @@ def run_analysis(
     if config.detect_pixel_identical and not controller.is_cancelled:
         cb.on_phase("pixels")
         meta_needed = [
-            sf for sf in images
-            if records[sf.path].width is None and records[sf.path].error is None
+            sf for sf in images if records[sf.path].width is None and records[sf.path].error is None
         ]
 
         def _meta(sf: ScannedFile):
@@ -268,10 +283,14 @@ def run_analysis(
                 rec.width, rec.height = info.oriented_size
 
         _parallel(
-            meta_needed, _meta,
-            workers=config.workers, controller=controller,
-            handle=_meta_done, emit=cb.on_step_progress,
-            label="Metadatos", started=started,
+            meta_needed,
+            _meta,
+            workers=config.workers,
+            controller=controller,
+            handle=_meta_done,
+            emit=cb.on_step_progress,
+            label="Metadatos",
+            started=started,
         )
 
         by_dims: dict[tuple[int, int], list[ScannedFile]] = defaultdict(list)
@@ -280,7 +299,10 @@ def run_analysis(
             if rec.width and rec.height:
                 by_dims[(rec.width, rec.height)].append(sf)
         pixel_candidates = [
-            sf for group in by_dims.values() if len(group) > 1 for sf in group
+            sf
+            for group in by_dims.values()
+            if len(group) > 1
+            for sf in group
             if records[sf.path].pixel_digest is None and records[sf.path].error is None
         ]
         decoded_files = len(pixel_candidates)
@@ -298,10 +320,14 @@ def run_analysis(
             rec.width, rec.height = info.width, info.height
 
         _parallel(
-            pixel_candidates, _pixels,
-            workers=config.workers, controller=controller,
-            handle=_pixels_done, emit=cb.on_step_progress,
-            label="Comparación de píxeles", started=started,
+            pixel_candidates,
+            _pixels,
+            workers=config.workers,
+            controller=controller,
+            handle=_pixels_done,
+            emit=cb.on_step_progress,
+            label="Comparación de píxeles",
+            started=started,
             group_count=lambda: _rough_pixel_groups(records.values()),
         )
 
@@ -313,8 +339,7 @@ def run_analysis(
     if config.analyze_similar_images and not controller.is_cancelled:
         cb.on_phase("perceptual")
         sig_needed = [
-            sf for sf in images
-            if records[sf.path].phash is None and records[sf.path].error is None
+            sf for sf in images if records[sf.path].phash is None and records[sf.path].error is None
         ]
         perceptual_files = len(sig_needed)
 
@@ -326,17 +351,24 @@ def run_analysis(
             if exc is not None or result is None:
                 return
             rec.phash, rec.dhash, rec.ahash, rec.bhash = (
-                result.phash, result.dhash, result.ahash, result.bhash
+                result.phash,
+                result.dhash,
+                result.ahash,
+                result.bhash,
             )
             rec.color_sig = result.color_sig
             if not rec.width:
                 rec.width, rec.height = result.width, result.height
 
         _parallel(
-            sig_needed, _sigs,
-            workers=config.workers, controller=controller,
-            handle=_sigs_done, emit=cb.on_step_progress,
-            label="Firmas de imagen", started=started,
+            sig_needed,
+            _sigs,
+            workers=config.workers,
+            controller=controller,
+            handle=_sigs_done,
+            emit=cb.on_step_progress,
+            label="Firmas de imagen",
+            started=started,
         )
 
         # -- 5b. optional AI embeddings ---------------------------
@@ -345,9 +377,9 @@ def run_analysis(
 
             if _emb.available():
                 emb_needed = [
-                    sf for sf in images
-                    if records[sf.path].embedding is None
-                    and records[sf.path].error is None
+                    sf
+                    for sf in images
+                    if records[sf.path].embedding is None and records[sf.path].error is None
                 ]
                 cb.on_phase("embeddings")
 
@@ -359,10 +391,14 @@ def run_analysis(
                         records[sf.path].embedding = result
 
                 _parallel(
-                    emb_needed, _do_emb,
-                    workers=max(1, min(config.workers, 2)), controller=controller,
-                    handle=_emb_done, emit=cb.on_step_progress,
-                    label="Embeddings visuales", started=started,
+                    emb_needed,
+                    _do_emb,
+                    workers=max(1, min(config.workers, 2)),
+                    controller=controller,
+                    handle=_emb_done,
+                    emit=cb.on_step_progress,
+                    label="Embeddings visuales",
+                    started=started,
                 )
             else:
                 cb.on_message(
@@ -374,7 +410,11 @@ def run_analysis(
         if profile.detect_crops and not controller.is_cancelled:
             crop_edges = _detect_crops(
                 [records[sf.path] for sf in images],
-                controller, cb, config.workers, started, profile.bands,
+                controller,
+                cb,
+                config.workers,
+                started,
+                profile.bands,
             )
 
     # -- 6. video analysis (opt-in, needs FFmpeg) -----------------
@@ -401,10 +441,13 @@ def run_analysis(
             if incremental and row and row.is_valid_for(sf.size, sf.mtime) and row.video_duration:
                 rec.video_info = VideoInfo(
                     duration=row.video_duration or 0.0,
-                    width=row.video_width or 0, height=row.video_height or 0,
-                    video_codec=row.video_codec or "", fps=row.video_fps or 0.0,
+                    width=row.video_width or 0,
+                    height=row.video_height or 0,
+                    video_codec=row.video_codec or "",
+                    fps=row.video_fps or 0.0,
                     bitrate=row.video_bitrate or 0,
-                    has_audio=bool(row.video_audio), audio_codec=row.video_audio or "",
+                    has_audio=bool(row.video_audio),
+                    audio_codec=row.video_audio or "",
                 )
                 rec.frame_hashes = decode_frame_hashes(row.frame_hashes) or None
 
@@ -412,15 +455,14 @@ def run_analysis(
             from app.core.ffmpeg import install_hint
 
             cb.on_message(
-                "FFmpeg no está disponible: se omite el análisis de vídeo. "
-                + install_hint()
+                "FFmpeg no está disponible: se omite el análisis de vídeo. " + install_hint()
             )
         elif video_files:
             cb.on_phase("video_metadata")
             probe_needed = [
-                sf for sf in video_files
-                if records[sf.path].video_info is None
-                and records[sf.path].error is None
+                sf
+                for sf in video_files
+                if records[sf.path].video_info is None and records[sf.path].error is None
             ]
 
             def _probe(sf: ScannedFile):
@@ -438,14 +480,17 @@ def run_analysis(
                     rec.width, rec.height = info.width, info.height
 
             _parallel(
-                probe_needed, _probe,
-                workers=max(1, min(config.workers, 4)), controller=controller,
-                handle=_probe_done, emit=cb.on_step_progress,
-                label="Metadatos de vídeo", started=started,
+                probe_needed,
+                _probe,
+                workers=max(1, min(config.workers, 4)),
+                controller=controller,
+                handle=_probe_done,
+                emit=cb.on_step_progress,
+                label="Metadatos de vídeo",
+                started=started,
             )
             videos_probed = sum(
-                1 for sf in video_files
-                if getattr(records[sf.path].video_info, "ok", False)
+                1 for sf in video_files if getattr(records[sf.path].video_info, "ok", False)
             )
 
             # frame-hash candidates: another video within 2s of duration and not
@@ -459,10 +504,7 @@ def run_analysis(
             for sf in probed:
                 if records[sf.path].frame_hashes is not None:
                     continue
-                if any(
-                    other is not sf and abs(_dur(sf) - _dur(other)) <= 2.0
-                    for other in probed
-                ):
+                if any(other is not sf and abs(_dur(sf) - _dur(other)) <= 2.0 for other in probed):
                     frame_candidates.append(sf)
 
             if frame_candidates and not controller.is_cancelled:
@@ -470,7 +512,9 @@ def run_analysis(
 
                 def _frames(sf: ScannedFile):
                     return extract_frame_hashes(
-                        sf.path, tools, records[sf.path].video_info,
+                        sf.path,
+                        tools,
+                        records[sf.path].video_info,
                         check=controller.checkpoint,
                     )
 
@@ -479,10 +523,14 @@ def run_analysis(
                         records[sf.path].frame_hashes = result
 
                 _parallel(
-                    frame_candidates, _frames,
-                    workers=max(1, min(config.workers, 4)), controller=controller,
-                    handle=_frames_done, emit=cb.on_step_progress,
-                    label="Fotogramas de vídeo", started=started,
+                    frame_candidates,
+                    _frames,
+                    workers=max(1, min(config.workers, 4)),
+                    controller=controller,
+                    handle=_frames_done,
+                    emit=cb.on_step_progress,
+                    label="Fotogramas de vídeo",
+                    started=started,
                 )
                 video_frames_sampled = len(frame_candidates)
 
@@ -544,13 +592,14 @@ def _detect_crops(image_recs, controller, cb, workers, started, bands) -> list:
         return Signals(r.phash, r.dhash, r.ahash, r.bhash, r.color_sig, r.width, r.height)
 
     usable = [
-        r for r in image_recs
+        r
+        for r in image_recs
         if r.color_sig and r.width and r.height and not r.error and r.phash is not None
     ]
     pairs: list[tuple] = []
     for i, a in enumerate(usable):
         aa = a.width / a.height if a.height else 0
-        for b in usable[i + 1:]:
+        for b in usable[i + 1 :]:
             ab = b.width / b.height if b.height else 0
             if not aa or not ab:
                 continue
@@ -592,10 +641,14 @@ def _detect_crops(image_recs, controller, cb, workers, started, bands) -> list:
             found.append((a, b, result.score, result.region))
 
     _parallel(
-        pairs, _one,
-        workers=max(1, min(workers, 4)), controller=controller,
-        handle=_done, emit=cb.on_step_progress,
-        label="Detección de recortes", started=started,
+        pairs,
+        _one,
+        workers=max(1, min(workers, 4)),
+        controller=controller,
+        handle=_done,
+        emit=cb.on_step_progress,
+        label="Detección de recortes",
+        started=started,
     )
 
     # keep the single best crop edge per "small" image
@@ -609,7 +662,7 @@ def _detect_crops(image_recs, controller, cb, workers, started, bands) -> list:
 
 
 # ---------------------------------------------------------------------------
-def _open_cache(config: AppConfig, db_path: Optional[str]):
+def _open_cache(config: AppConfig, db_path: str | None):
     if not config.use_cache and db_path is None:
         return None
     try:
@@ -617,12 +670,12 @@ def _open_cache(config: AppConfig, db_path: Optional[str]):
 
         db = FileCacheDB(db_path or config.effective_db_path())
         return db if db.available else None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("Caché deshabilitada: %s", exc)
         return None
 
 
-def _hex_to_int(value: Optional[str]) -> Optional[int]:
+def _hex_to_int(value: str | None) -> int | None:
     if not value:
         return None
     try:
@@ -631,11 +684,11 @@ def _hex_to_int(value: Optional[str]) -> Optional[int]:
         return None
 
 
-def _int_to_hex(value: Optional[int]) -> Optional[str]:
+def _int_to_hex(value: int | None) -> str | None:
     return None if value is None else f"{value:x}"
 
 
-def _encode_embedding(vec) -> Optional[str]:
+def _encode_embedding(vec) -> str | None:
     if not vec:
         return None
     from app.core.embeddings import encode
@@ -682,7 +735,7 @@ def _to_cached(rec: FileRecord):
     )
 
 
-def _encode_frames(frames) -> Optional[str]:
+def _encode_frames(frames) -> str | None:
     from app.core.video_analyzer import encode_frame_hashes
 
     return encode_frame_hashes(frames)

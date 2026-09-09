@@ -5,6 +5,7 @@ Follows the platform conventions:
   * macOS   : ~/Library/Application Support, ~/Library/Caches
   * Linux   : XDG base directories (~/.config, ~/.cache, ~/.local/share)
 """
+
 from __future__ import annotations
 
 import os

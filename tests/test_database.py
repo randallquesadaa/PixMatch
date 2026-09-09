@@ -10,10 +10,12 @@ def _db(tmp_path):
 
 def test_upsert_and_get(tmp_path):
     db = _db(tmp_path)
-    db.upsert_many([
-        CachedFile(path="/a.jpg", size=100, mtime=1000.0, sha256="deadbeef"),
-        CachedFile(path="/b.jpg", size=200, mtime=2000.0, phash="00ff00ff00ff00ff"),
-    ])
+    db.upsert_many(
+        [
+            CachedFile(path="/a.jpg", size=100, mtime=1000.0, sha256="deadbeef"),
+            CachedFile(path="/b.jpg", size=200, mtime=2000.0, phash="00ff00ff00ff00ff"),
+        ]
+    )
     got = db.get_many(["/a.jpg", "/b.jpg", "/missing.jpg"])
     assert set(got) == {"/a.jpg", "/b.jpg"}
     assert got["/a.jpg"].sha256 == "deadbeef"
@@ -33,9 +35,9 @@ def test_upsert_replaces_existing(tmp_path):
 def test_validity_check():
     row = CachedFile(path="/a", size=100, mtime=1234.5678, sha256="x")
     assert row.is_valid_for(100, 1234.5678)
-    assert row.is_valid_for(100, 1234.5679)          # within tolerance
-    assert not row.is_valid_for(101, 1234.5678)      # size changed
-    assert not row.is_valid_for(100, 9999.0)         # mtime changed
+    assert row.is_valid_for(100, 1234.5679)  # within tolerance
+    assert not row.is_valid_for(101, 1234.5678)  # size changed
+    assert not row.is_valid_for(100, 9999.0)  # mtime changed
 
 
 def test_persistence_across_reopen(tmp_path):
@@ -51,11 +53,13 @@ def test_persistence_across_reopen(tmp_path):
 
 def test_prune_missing(tmp_path):
     db = _db(tmp_path)
-    db.upsert_many([
-        CachedFile(path="/a", size=1, mtime=1.0),
-        CachedFile(path="/b", size=1, mtime=1.0),
-        CachedFile(path="/c", size=1, mtime=1.0),
-    ])
+    db.upsert_many(
+        [
+            CachedFile(path="/a", size=1, mtime=1.0),
+            CachedFile(path="/b", size=1, mtime=1.0),
+            CachedFile(path="/c", size=1, mtime=1.0),
+        ]
+    )
     removed = db.prune_missing(["/a", "/c"])
     assert removed == 1
     assert set(db.get_many(["/a", "/b", "/c"])) == {"/a", "/c"}

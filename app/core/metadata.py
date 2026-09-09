@@ -5,12 +5,12 @@ plugins (``pillow-heif`` / ``pillow-avif-plugin``) are installed.
 
 Nothing here ever writes to a file.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 from PIL import ExifTags, Image
 
@@ -21,12 +21,12 @@ try:  # pragma: no cover - depends on the environment
     import pillow_heif  # type: ignore
 
     pillow_heif.register_heif_opener()
-except Exception:  # noqa: BLE001
+except Exception:
     pass
 
 try:  # pragma: no cover
     import pillow_avif  # type: ignore  # noqa: F401
-except Exception:  # noqa: BLE001
+except Exception:
     pass
 
 # Raise the default 89 MP limit (many phone panoramas exceed it) but keep a
@@ -45,12 +45,12 @@ class ImageInfo:
     height: int = 0
     format: str = ""
     mode: str = ""
-    orientation: int = 1          # raw EXIF orientation (1 == normal)
+    orientation: int = 1  # raw EXIF orientation (1 == normal)
     has_exif: bool = False
     camera_make: str = ""
     camera_model: str = ""
-    date_taken: Optional[str] = None
-    error: Optional[str] = None
+    date_taken: str | None = None
+    error: str | None = None
 
     @property
     def oriented_size(self) -> tuple[int, int]:
@@ -82,7 +82,7 @@ def read_image_info(path: str | os.PathLike[str]) -> ImageInfo:
             )
             try:
                 exif = img.getexif()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 exif = None
 
             if exif:
@@ -90,9 +90,8 @@ def read_image_info(path: str | os.PathLike[str]) -> ImageInfo:
                 info.orientation = int(exif.get(_ORIENTATION_TAG, 1) or 1)
                 make = exif.get(_EXIF_NAME.get("Make", -1))
                 model = exif.get(_EXIF_NAME.get("Model", -1))
-                dt = (
-                    exif.get(_EXIF_NAME.get("DateTimeOriginal", -1))
-                    or exif.get(_EXIF_NAME.get("DateTime", -1))
+                dt = exif.get(_EXIF_NAME.get("DateTimeOriginal", -1)) or exif.get(
+                    _EXIF_NAME.get("DateTime", -1)
                 )
                 if make:
                     info.camera_make = _decode(make)
@@ -107,11 +106,11 @@ def read_image_info(path: str | os.PathLike[str]) -> ImageInfo:
         return ImageInfo(error="Permisos insuficientes para leer el archivo.")
     except Image.UnidentifiedImageError:
         return ImageInfo(error="Formato no reconocido o imagen no procesable.")
-    except Exception as exc:  # noqa: BLE001 - corrupt / truncated files land here
+    except Exception as exc:
         return ImageInfo(error=f"Imagen no procesable: {exc}")
 
 
-def file_timestamps(path: str | os.PathLike[str]) -> tuple[Optional[str], str]:
+def file_timestamps(path: str | os.PathLike[str]) -> tuple[str | None, str]:
     """Return (creation_iso_or_None, modified_iso). Creation time is not
     available on every platform/filesystem."""
     try:
@@ -123,8 +122,6 @@ def file_timestamps(path: str | os.PathLike[str]) -> tuple[Optional[str], str]:
     if created_ts is None and os.name == "nt":
         created_ts = st.st_ctime
     created = (
-        _dt.datetime.fromtimestamp(created_ts).isoformat(timespec="seconds")
-        if created_ts
-        else None
+        _dt.datetime.fromtimestamp(created_ts).isoformat(timespec="seconds") if created_ts else None
     )
     return created, modified

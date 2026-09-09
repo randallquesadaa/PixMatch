@@ -4,6 +4,7 @@ Both run on a plain ``threading.Thread``; the QObject stays on the GUI thread
 and its signals reach the UI through queued connections (same pattern as
 :class:`app.workers.deletion_worker.DeletionRunner`).
 """
+
 from __future__ import annotations
 
 import threading
@@ -12,7 +13,7 @@ from PySide6.QtCore import QObject, Signal
 
 from app.config import AppConfig
 from app.core.renamer import RenameReport, apply_renames, build_rename_plan, undo_renames
-from app.core.scanner import FileKind, ScanOptions, Scanner
+from app.core.scanner import FileKind, Scanner, ScanOptions
 from app.database.history import OperationHistory
 from app.utils.control import RunController
 from app.utils.logging_setup import get_logger
@@ -23,8 +24,8 @@ log = get_logger(__name__)
 class RenamePreviewRunner(QObject):
     """Scan a folder and build the rename plan (reads EXIF - can be slow)."""
 
-    progress = Signal(str)              # human status line
-    finished = Signal(object)           # list[RenamePlan]
+    progress = Signal(str)  # human status line
+    finished = Signal(object)  # list[RenamePlan]
     failed = Signal(str)
 
     def __init__(self, folder: str, config: AppConfig) -> None:
@@ -60,9 +61,7 @@ class RenamePreviewRunner(QObject):
             collected: list = []
             Scanner(self._folder, opts, self.controller).scan(
                 on_file=collected.append,
-                on_progress=lambda s: self.progress.emit(
-                    f"Escaneando… {s.files_found:,} archivos"
-                ),
+                on_progress=lambda s: self.progress.emit(f"Escaneando… {s.files_found:,} archivos"),
             )
             if self.controller.is_cancelled:
                 self.finished.emit([])
@@ -74,7 +73,7 @@ class RenamePreviewRunner(QObject):
                     from app.core.ffmpeg import detect
 
                     tools = detect(cfg.ffmpeg_path, cfg.ffprobe_path)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     tools = None
 
             self.progress.emit(f"Leyendo fechas de {len(collected):,} archivos…")
@@ -91,7 +90,7 @@ class RenamePreviewRunner(QObject):
                 ),
             )
             self.finished.emit(plans)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("Rename preview crashed")
             self.failed.emit(str(exc))
         finally:
@@ -100,7 +99,7 @@ class RenamePreviewRunner(QObject):
 
 class RenameApplyRunner(QObject):
     progress = Signal(int, int, str)
-    finished = Signal(object)           # RenameReport
+    finished = Signal(object)  # RenameReport
     failed = Signal(str)
 
     def __init__(self, plans, history: OperationHistory, *, undo_of=None) -> None:
@@ -131,12 +130,13 @@ class RenameApplyRunner(QObject):
                 )
             else:
                 report = apply_renames(
-                    self._plans, history=history,
+                    self._plans,
+                    history=history,
                     progress=lambda d, t, n: self.progress.emit(d, t, n),
                     check=self.controller.checkpoint,
                 )
             self.finished.emit(report)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("Rename apply crashed")
             self.failed.emit(str(exc))
         finally:

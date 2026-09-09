@@ -16,15 +16,16 @@ Safety:
   * the rename is two-phase (via a temp name) so swaps / cycles are safe
   * every rename is written to the operation history and can be undone
 """
+
 from __future__ import annotations
 
 import os
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Iterable, Optional
 
 from PIL import Image
 
@@ -42,10 +43,10 @@ PATTERN_PRESETS = [
     ("%Y_%m_%d_%H_%M_%S", "2022_12_02_14_30_05"),
 ]
 
-_EXIF_DATETIME = 0x0132        # 306  DateTime
-_EXIF_IFD = 0x8769             # ExifOffset
-_EXIF_DT_ORIGINAL = 0x9003     # 36867 DateTimeOriginal
-_EXIF_DT_DIGITIZED = 0x9004    # 36868 DateTimeDigitized
+_EXIF_DATETIME = 0x0132  # 306  DateTime
+_EXIF_IFD = 0x8769  # ExifOffset
+_EXIF_DT_ORIGINAL = 0x9003  # 36867 DateTimeOriginal
+_EXIF_DT_DIGITIZED = 0x9004  # 36868 DateTimeDigitized
 
 
 class DateSource(str, Enum):
@@ -72,8 +73,8 @@ class DateSource(str, Enum):
 
 class RenameStatus(str, Enum):
     RENAME = "rename"
-    SUFFIXED = "suffixed"       # rename + a numeric suffix to avoid a clash
-    UNCHANGED = "unchanged"     # already has the right name
+    SUFFIXED = "suffixed"  # rename + a numeric suffix to avoid a clash
+    UNCHANGED = "unchanged"  # already has the right name
     ERROR = "error"
 
     @property
@@ -93,9 +94,9 @@ class RenamePlan:
     old_name: str
     new_name: str
     source: DateSource
-    timestamp: Optional[datetime]
+    timestamp: datetime | None
     status: RenameStatus
-    error: Optional[str] = None
+    error: str | None = None
     enabled: bool = True
 
     @property
@@ -104,10 +105,7 @@ class RenamePlan:
 
     @property
     def will_change(self) -> bool:
-        return (
-            self.enabled
-            and self.status in (RenameStatus.RENAME, RenameStatus.SUFFIXED)
-        )
+        return self.enabled and self.status in (RenameStatus.RENAME, RenameStatus.SUFFIXED)
 
 
 @dataclass
@@ -116,7 +114,7 @@ class RenameOutcome:
     old_name: str
     new_name: str
     ok: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -134,18 +132,17 @@ class RenameReport:
 
 
 # ---------------------------------------------------------------------------
-def _parse_exif_datetime(value) -> Optional[datetime]:
+def _parse_exif_datetime(value) -> datetime | None:
     if not value:
         return None
     if isinstance(value, bytes):
         value = value.decode("ascii", "replace")
     text = str(value).strip().strip("\x00").strip()
-    if not text or text.startswith("0000") or text.startswith("    "):
+    if not text or text.startswith(("0000", "    ")):
         return None
     # EXIF is "YYYY:MM:DD HH:MM:SS"; drop any sub-second / timezone tail
     core = text.replace("T", " ").split(".")[0].split("+")[0].strip()
-    for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S",
-                "%Y:%m:%d %H:%M", "%Y-%m-%d %H:%M"):
+    for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y:%m:%d %H:%M", "%Y-%m-%d %H:%M"):
         try:
             return datetime.strptime(core, fmt)
         except ValueError:
@@ -162,7 +159,7 @@ def _exif_datetimes(path: str) -> dict[DateSource, datetime]:
     try:
         with Image.open(extended_path(path)) as img:
             exif = img.getexif()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return out
     if not exif:
         return out
@@ -171,7 +168,7 @@ def _exif_datetimes(path: str) -> dict[DateSource, datetime]:
         out[DateSource.EXIF_DATETIME] = dt
     try:
         sub = exif.get_ifd(_EXIF_IFD)
-    except Exception:  # noqa: BLE001
+    except Exception:
         sub = {}
     if sub:
         dto = _parse_exif_datetime(sub.get(_EXIF_DT_ORIGINAL))
@@ -183,7 +180,7 @@ def _exif_datetimes(path: str) -> dict[DateSource, datetime]:
     return out
 
 
-def _video_datetime(path: str, ffmpeg_tools) -> Optional[datetime]:
+def _video_datetime(path: str, ffmpeg_tools) -> datetime | None:
     if ffmpeg_tools is None or not getattr(ffmpeg_tools, "available", False):
         return None
     try:
@@ -191,7 +188,7 @@ def _video_datetime(path: str, ffmpeg_tools) -> Optional[datetime]:
 
         info = probe_video(path, ffmpeg_tools)
         return _parse_exif_datetime(info.creation_time) if info.creation_time else None
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
 
 
@@ -202,8 +199,7 @@ def capture_datetime(
     (falls back to the file mtime)."""
     if kind == "image":
         found = _exif_datetimes(path)
-        for src in (DateSource.EXIF_ORIGINAL, DateSource.EXIF_DIGITIZED,
-                    DateSource.EXIF_DATETIME):
+        for src in (DateSource.EXIF_ORIGINAL, DateSource.EXIF_DIGITIZED, DateSource.EXIF_DATETIME):
             if src in found:
                 return found[src], src
     elif kind == "video":
@@ -225,15 +221,15 @@ def _format_name(dt: datetime, pattern: str, prefix: str, ext: str) -> str:
 
 
 def build_rename_plan(
-    files: Iterable,                 # objects with .path, .kind (FileKind), .mtime
+    files: Iterable,  # objects with .path, .kind (FileKind), .mtime
     *,
     pattern: str = DEFAULT_PATTERN,
     prefix: str = "",
     lowercase_ext: bool = True,
     normalise_jpeg: bool = True,
     ffmpeg_tools=None,
-    check: Optional[Callable[[], bool]] = None,
-    on_progress: Optional[Callable[[int, int], None]] = None,
+    check: Callable[[], bool] | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> list[RenamePlan]:
     files = list(files)
     plans: list[RenamePlan] = []
@@ -243,13 +239,19 @@ def build_rename_plan(
         kind = f.kind.value if hasattr(f.kind, "value") else str(f.kind)
         try:
             dt, source = capture_datetime(f.path, kind, f.mtime, ffmpeg_tools=ffmpeg_tools)
-        except Exception as exc:  # noqa: BLE001
-            plans.append(RenamePlan(
-                path=f.path, directory=os.path.dirname(f.path),
-                old_name=os.path.basename(f.path), new_name=os.path.basename(f.path),
-                source=DateSource.FILE_MTIME, timestamp=None,
-                status=RenameStatus.ERROR, error=str(exc),
-            ))
+        except Exception as exc:
+            plans.append(
+                RenamePlan(
+                    path=f.path,
+                    directory=os.path.dirname(f.path),
+                    old_name=os.path.basename(f.path),
+                    new_name=os.path.basename(f.path),
+                    source=DateSource.FILE_MTIME,
+                    timestamp=None,
+                    status=RenameStatus.ERROR,
+                    error=str(exc),
+                )
+            )
             continue
 
         old_name = os.path.basename(f.path)
@@ -258,14 +260,18 @@ def build_rename_plan(
         if normalise_jpeg and ext in (".jpeg", ".jpe", ".jfif"):
             ext = ".jpg"
         new_name = _format_name(dt, pattern, prefix, ext)
-        status = (
-            RenameStatus.UNCHANGED if new_name == old_name else RenameStatus.RENAME
+        status = RenameStatus.UNCHANGED if new_name == old_name else RenameStatus.RENAME
+        plans.append(
+            RenamePlan(
+                path=f.path,
+                directory=os.path.dirname(f.path),
+                old_name=old_name,
+                new_name=new_name,
+                source=source,
+                timestamp=dt,
+                status=status,
+            )
         )
-        plans.append(RenamePlan(
-            path=f.path, directory=os.path.dirname(f.path),
-            old_name=old_name, new_name=new_name,
-            source=source, timestamp=dt, status=status,
-        ))
         if on_progress is not None and (i % 50 == 0 or i == len(files) - 1):
             on_progress(i + 1, len(files))
 
@@ -320,8 +326,8 @@ def apply_renames(
     plans: Iterable[RenamePlan],
     *,
     history=None,
-    progress: Optional[Callable[[int, int, str], None]] = None,
-    check: Optional[Callable[[], bool]] = None,
+    progress: Callable[[int, int, str], None] | None = None,
+    check: Callable[[], bool] | None = None,
 ) -> RenameReport:
     todo = [p for p in plans if p.will_change and p.old_name != p.new_name]
     outcomes: list[RenameOutcome] = []
@@ -340,8 +346,7 @@ def apply_renames(
             os.rename(extended_path(p.path), extended_path(tmp))
             staged.append((p, tmp))
         except OSError as exc:
-            outcomes.append(RenameOutcome(p.path, p.old_name, p.new_name, False,
-                                          _os_error(exc)))
+            outcomes.append(RenameOutcome(p.path, p.old_name, p.new_name, False, _os_error(exc)))
 
     # -- phase 2: temp -> final name --
     total = len(staged)
@@ -349,9 +354,16 @@ def apply_renames(
         final = p.new_path
         try:
             if os.path.exists(extended_path(final)):
-                os.rename(extended_path(tmp), extended_path(p.path))   # roll back
-                outcomes.append(RenameOutcome(p.path, p.old_name, p.new_name, False,
-                                              "El destino ya existe (creado por otro programa)."))
+                os.rename(extended_path(tmp), extended_path(p.path))  # roll back
+                outcomes.append(
+                    RenameOutcome(
+                        p.path,
+                        p.old_name,
+                        p.new_name,
+                        False,
+                        "El destino ya existe (creado por otro programa).",
+                    )
+                )
             else:
                 os.rename(extended_path(tmp), extended_path(final))
                 outcomes.append(RenameOutcome(p.path, p.old_name, p.new_name, True))
@@ -359,13 +371,17 @@ def apply_renames(
             try:
                 os.rename(extended_path(tmp), extended_path(p.path))
             except OSError:
-                outcomes.append(RenameOutcome(
-                    p.path, p.old_name, p.new_name, False,
-                    f"{_os_error(exc)} — el archivo quedó como «{os.path.basename(tmp)}»",
-                ))
+                outcomes.append(
+                    RenameOutcome(
+                        p.path,
+                        p.old_name,
+                        p.new_name,
+                        False,
+                        f"{_os_error(exc)} — el archivo quedó como «{os.path.basename(tmp)}»",
+                    )
+                )
                 continue
-            outcomes.append(RenameOutcome(p.path, p.old_name, p.new_name, False,
-                                          _os_error(exc)))
+            outcomes.append(RenameOutcome(p.path, p.old_name, p.new_name, False, _os_error(exc)))
         if progress is not None:
             progress(i, total, p.new_name)
 
@@ -377,7 +393,7 @@ def undo_renames(
     outcomes: Iterable[RenameOutcome],
     *,
     history=None,
-    check: Optional[Callable[[], bool]] = None,
+    check: Callable[[], bool] | None = None,
 ) -> RenameReport:
     """Rename the successful outcomes back to their original names."""
     inverse: list[RenamePlan] = []
@@ -385,15 +401,17 @@ def undo_renames(
         if not o.ok:
             continue
         directory = os.path.dirname(o.path)
-        inverse.append(RenamePlan(
-            path=os.path.join(directory, o.new_name),
-            directory=directory,
-            old_name=o.new_name,
-            new_name=o.old_name,
-            source=DateSource.FILE_MTIME,
-            timestamp=None,
-            status=RenameStatus.RENAME,
-        ))
+        inverse.append(
+            RenamePlan(
+                path=os.path.join(directory, o.new_name),
+                directory=directory,
+                old_name=o.new_name,
+                new_name=o.old_name,
+                source=DateSource.FILE_MTIME,
+                timestamp=None,
+                status=RenameStatus.RENAME,
+            )
+        )
     return apply_renames(inverse, history=history, check=check)
 
 
@@ -408,11 +426,13 @@ def _record_history(history, outcomes: list[RenameOutcome]) -> None:
         from app.database.history import OperationEntry
 
         for o in outcomes:
-            history.record(OperationEntry.now(
-                path=o.path if not o.ok else os.path.join(os.path.dirname(o.path), o.new_name),
-                action="rename",
-                result="ok" if o.ok else "error",
-                detail=(o.error if not o.ok else f"{o.old_name} → {o.new_name}"),
-            ))
-    except Exception as exc:  # noqa: BLE001
+            history.record(
+                OperationEntry.now(
+                    path=o.path if not o.ok else os.path.join(os.path.dirname(o.path), o.new_name),
+                    action="rename",
+                    result="ok" if o.ok else "error",
+                    detail=(o.error if not o.ok else f"{o.old_name} → {o.new_name}"),
+                )
+            )
+    except Exception as exc:
         log.warning("No se pudo registrar el renombrado: %s", exc)

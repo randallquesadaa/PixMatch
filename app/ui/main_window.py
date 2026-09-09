@@ -1,5 +1,6 @@
 """Main application window: folder selection, analysis lifecycle, dashboard
 and the duplicate browser."""
+
 from __future__ import annotations
 
 import os
@@ -26,12 +27,12 @@ from PySide6.QtWidgets import (
 
 from app import APP_NAME, __version__
 from app.config import AppConfig
-from app.i18n import tr
 from app.core.analysis import StepProgress
 from app.core.deletion_manager import DeletionMode, build_preview, build_preview_for
 from app.core.duplicate_groups import AnalysisResult
 from app.core.scanner import ScanStats
 from app.database.history import OperationHistory
+from app.i18n import tr
 from app.ui.deletion_dialog import DeletionConfirmDialog, HistoryDialog
 from app.ui.duplicate_view import DuplicateView
 from app.ui.rename_view import RenameView
@@ -80,7 +81,9 @@ class MainWindow(QMainWindow):
 
         self.act_pick = QAction(tr("📁  Seleccionar carpeta"), self)
         self.act_analyze = QAction(tr("▶  Analizar"), self)
-        self.act_analyze.setToolTip("Análisis incremental: reutiliza la caché para archivos sin cambios.")
+        self.act_analyze.setToolTip(
+            "Análisis incremental: reutiliza la caché para archivos sin cambios."
+        )
         self.act_analyze_full = QAction(tr("↻  Análisis completo"), self)
         self.act_analyze_full.setToolTip("Ignora la caché y recalcula todo.")
         self.act_pause = QAction(tr("⏸  Pausar"), self)
@@ -96,7 +99,13 @@ class MainWindow(QMainWindow):
         self.act_settings.triggered.connect(self.open_settings)
         self.act_theme.triggered.connect(self.toggle_theme)
 
-        for a in (self.act_pick, self.act_analyze, self.act_analyze_full, self.act_pause, self.act_cancel):
+        for a in (
+            self.act_pick,
+            self.act_analyze,
+            self.act_analyze_full,
+            self.act_pause,
+            self.act_cancel,
+        ):
             tb.addAction(a)
         tb.addSeparator()
         spacer = QWidget()
@@ -143,20 +152,18 @@ class MainWindow(QMainWindow):
 
     def _build_pages(self) -> None:
         self.stack = QStackedWidget()
-        self.stack.addWidget(self._welcome_page())      # 0
-        self.stack.addWidget(self._progress_page())     # 1
-        self.stack.addWidget(self._dashboard_page())    # 2
+        self.stack.addWidget(self._welcome_page())  # 0
+        self.stack.addWidget(self._progress_page())  # 1
+        self.stack.addWidget(self._dashboard_page())  # 2
         self.duplicate_view = DuplicateView()
         self.duplicate_view.decisions_changed.connect(self._on_decisions_changed)
         self.duplicate_view.deletion_requested.connect(self._perform_deletion)
         self.duplicate_view.single_deletion_requested.connect(self._perform_single_deletion)
-        self.stack.addWidget(self.duplicate_view)       # 3
+        self.stack.addWidget(self.duplicate_view)  # 3
         self.stack.setCurrentIndex(_PAGE_WELCOME)
 
         self.rename_view = RenameView(self.config, self.history)
-        self.rename_view.status_message.connect(
-            lambda m: self.statusBar().showMessage(m, 6000)
-        )
+        self.rename_view.status_message.connect(lambda m: self.statusBar().showMessage(m, 6000))
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.stack, "🔍  Duplicados")
@@ -286,8 +293,13 @@ class MainWindow(QMainWindow):
         self.btn_view_similar.clicked.connect(lambda: self._open_duplicates("Similares"))
         self.btn_view_videos.clicked.connect(lambda: self._open_duplicates("Videos"))
         self.btn_rescan.clicked.connect(lambda: self.start_analysis(incremental=True))
-        for b in (self.btn_view_dupes, self.btn_view_identical, self.btn_view_similar,
-                  self.btn_view_videos, self.btn_rescan):
+        for b in (
+            self.btn_view_dupes,
+            self.btn_view_identical,
+            self.btn_view_similar,
+            self.btn_view_videos,
+            self.btn_rescan,
+        ):
             btns.addWidget(b)
 
         outer.addWidget(self.dash_title)
@@ -326,10 +338,12 @@ class MainWindow(QMainWindow):
             self.rename_view.set_folder(self._folder)
 
     def _update_folder_label(self) -> None:
-        self.folder_label.setText(f"📁 {self._folder}" if self._folder else "Ninguna carpeta seleccionada")
+        self.folder_label.setText(
+            f"📁 {self._folder}" if self._folder else "Ninguna carpeta seleccionada"
+        )
 
     # drag & drop
-    def dragEnterEvent(self, event) -> None:  # noqa: N802
+    def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
                 if url.isLocalFile() and os.path.isdir(url.toLocalFile()):
@@ -337,7 +351,7 @@ class MainWindow(QMainWindow):
                     return
         event.ignore()
 
-    def dropEvent(self, event) -> None:  # noqa: N802
+    def dropEvent(self, event) -> None:
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if os.path.isdir(path):
@@ -390,9 +404,12 @@ class MainWindow(QMainWindow):
     def cancel_analysis(self) -> None:
         if not self._analysis.running:
             return
-        if QMessageBox.question(
-            self, "Cancelar análisis", "¿Seguro que quieres cancelar el análisis en curso?"
-        ) == QMessageBox.Yes:
+        if (
+            QMessageBox.question(
+                self, "Cancelar análisis", "¿Seguro que quieres cancelar el análisis en curso?"
+            )
+            == QMessageBox.Yes
+        ):
             self.progress_title.setText("Cancelando…")
             self._analysis.cancel()
 
@@ -427,9 +444,7 @@ class MainWindow(QMainWindow):
     def _on_step_progress(self, p: StepProgress) -> None:
         pct = int(p.done * 100 / p.total) if p.total else 0
         self.progress_bar.setValue(pct)
-        groups = (
-            f"   ·   Grupos: {p.groups_so_far:,}" if p.groups_so_far else ""
-        )
+        groups = f"   ·   Grupos: {p.groups_so_far:,}" if p.groups_so_far else ""
         self.progress_detail.setText(
             f"{p.label}: {p.done:,} / {p.total:,}{groups}   ·   "
             f"Transcurrido: {human_duration(p.elapsed)}   ·   "
@@ -444,7 +459,9 @@ class MainWindow(QMainWindow):
         self._refresh_toolbar_state(running=False)
         THUMBNAIL_CACHE.clear_memory()
         if result.cancelled:
-            self.statusBar().showMessage("Análisis cancelado. Se muestran resultados parciales.", 8000)
+            self.statusBar().showMessage(
+                "Análisis cancelado. Se muestran resultados parciales.", 8000
+            )
         self._populate_dashboard(result)
         self.duplicate_view.load(result)
         self.stack.setCurrentIndex(_PAGE_DASHBOARD)
@@ -453,7 +470,8 @@ class MainWindow(QMainWindow):
             a.setEnabled(has_groups)
         log.info(
             "Analysis done: %d groups, %d redundant copies, %s reclaimable",
-            len(result.groups), result.redundant_copies,
+            len(result.groups),
+            result.redundant_copies,
             human_size(result.reclaimable_bytes),
         )
 
@@ -482,12 +500,24 @@ class MainWindow(QMainWindow):
             ("Reutilizados de la caché", f"{r.cache_hits:,}"),
             ("Sensibilidad de detección", str(r.sensitivity).capitalize()),
             ("—", "—"),
-            ("Grupos de duplicados", f"{len(r.unresolved_groups):,} sin resolver / {len(r.groups):,} total"),
-            ("  🟢 Archivo idéntico", f"{len(r.file_identical_groups):,} grupos · {r.identical_file_count:,} archivos"),
-            ("  🔵 Pixel por pixel idéntico", f"{len(r.pixel_identical_groups):,} grupos · {r.pixel_identical_file_count:,} archivos"),
+            (
+                "Grupos de duplicados",
+                f"{len(r.unresolved_groups):,} sin resolver / {len(r.groups):,} total",
+            ),
+            (
+                "  🟢 Archivo idéntico",
+                f"{len(r.file_identical_groups):,} grupos · {r.identical_file_count:,} archivos",
+            ),
+            (
+                "  🔵 Pixel por pixel idéntico",
+                f"{len(r.pixel_identical_groups):,} grupos · {r.pixel_identical_file_count:,} archivos",
+            ),
             ("  🟦 Redimensionados", f"{len(r.resized_groups):,} grupos"),
             ("  🟧 Recortes", f"{len(r.cropped_groups):,} grupos"),
-            ("  🟡 Similares (todas las categorías)", f"{len(r.similar_groups):,} grupos · {r.similar_file_count:,} archivos"),
+            (
+                "  🟡 Similares (todas las categorías)",
+                f"{len(r.similar_groups):,} grupos · {r.similar_file_count:,} archivos",
+            ),
             ("  · grupos de videos", f"{len(r.video_groups):,}"),
             ("Copias redundantes (dejando 1 por grupo)", f"{r.redundant_copies:,}"),
         ]
@@ -535,7 +565,9 @@ class MainWindow(QMainWindow):
 
     def _open_duplicates(self, filter_name: str) -> None:
         if not self._result or not self._result.groups:
-            QMessageBox.information(self, "Sin duplicados", "No se encontraron grupos de duplicados exactos.")
+            QMessageBox.information(
+                self, "Sin duplicados", "No se encontraron grupos de duplicados exactos."
+            )
             return
         idx = self.duplicate_view.filter_combo.findData(filter_name)
         if idx < 0:
@@ -548,14 +580,16 @@ class MainWindow(QMainWindow):
         if not self._result:
             return
         marked = [
-            r for g in self._result.groups if not g.ignored
-            for r in g.marked_for_deletion if not r.deleted
+            r
+            for g in self._result.groups
+            if not g.ignored
+            for r in g.marked_for_deletion
+            if not r.deleted
         ]
         freed = sum(r.size for r in marked)
         if marked:
             self.statusBar().showMessage(
-                f"Marcados para eliminar: {len(marked)} archivo(s) · liberaría "
-                f"{human_size(freed)}."
+                f"Marcados para eliminar: {len(marked)} archivo(s) · liberaría {human_size(freed)}."
             )
         else:
             self.statusBar().clearMessage()
@@ -568,7 +602,8 @@ class MainWindow(QMainWindow):
         preview = build_preview(self._result.groups)
         if preview.count == 0:
             QMessageBox.information(
-                self, "Nada que eliminar",
+                self,
+                "Nada que eliminar",
                 "No hay archivos marcados para eliminar. Marca archivos con "
                 "«Marcar para eliminar» o «Eliminar no seleccionados».",
             )
@@ -675,9 +710,7 @@ class MainWindow(QMainWindow):
             "html": ("Informe HTML (*.html)", ".html"),
         }
         flt, ext = filters[fmt]
-        default = os.path.join(
-            os.path.expanduser("~"), f"duplicados{ext}"
-        )
+        default = os.path.join(os.path.expanduser("~"), f"duplicados{ext}")
         path, _ = QFileDialog.getSaveFileName(self, "Exportar resultados", default, flt)
         if not path:
             return
@@ -690,29 +723,27 @@ class MainWindow(QMainWindow):
                 "html": export_mod.export_html,
             }[fmt]
             fn(self._result, path)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("Export failed")
             QMessageBox.critical(self, "Error al exportar", str(exc))
             return
         self.statusBar().showMessage(f"Exportado a {path}", 6000)
-        if QMessageBox.question(
-            self, "Exportado", f"Guardado en:\n{path}\n\n¿Abrir la carpeta?"
-        ) == QMessageBox.Yes:
+        if (
+            QMessageBox.question(self, "Exportado", f"Guardado en:\n{path}\n\n¿Abrir la carpeta?")
+            == QMessageBox.Yes
+        ):
             self._open_path(path)
 
     # ==================================================================
     def _on_dupe_page(self) -> bool:
-        return (
-            self.tabs.currentIndex() == 0
-            and self.stack.currentIndex() == _PAGE_DUPLICATES
-        )
+        return self.tabs.currentIndex() == 0 and self.stack.currentIndex() == _PAGE_DUPLICATES
 
     def _on_escape(self) -> None:
         if self._on_dupe_page():
             self.stack.setCurrentIndex(_PAGE_DASHBOARD)
 
     def open_settings(self) -> None:
-        from app.i18n import current_language, set_language
+        from app.i18n import set_language
 
         before_lang = self.config.language
         dlg = SettingsDialog(self.config, self)
@@ -722,7 +753,8 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Configuración guardada.", 4000)
             if self.config.language != before_lang:
                 QMessageBox.information(
-                    self, "Idioma",
+                    self,
+                    "Idioma",
                     "El idioma cambiará por completo al reiniciar la aplicación.",
                 )
 
@@ -733,7 +765,8 @@ class MainWindow(QMainWindow):
 
     def _about(self) -> None:
         QMessageBox.information(
-            self, "Acerca de",
+            self,
+            "Acerca de",
             f"{APP_NAME} {__version__}\n\n"
             "Fases 1-3:\n"
             "• Escaneo recursivo + SHA-256 (archivo idéntico)\n"
@@ -766,7 +799,7 @@ class MainWindow(QMainWindow):
         self.act_pause.setEnabled(running)
         self.act_cancel.setEnabled(running)
 
-    def closeEvent(self, event) -> None:  # noqa: N802
+    def closeEvent(self, event) -> None:
         self._analysis.shutdown()
         if self._deletion is not None:
             self._deletion.cancel()

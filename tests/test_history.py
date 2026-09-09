@@ -6,8 +6,11 @@ from app.database.history import OperationEntry, OperationHistory
 def test_record_and_recent(tmp_path):
     h = OperationHistory(tmp_path / "h.sqlite3")
     h.record(OperationEntry.now(path="/a.jpg", action="trash", result="ok", size=100))
-    h.record(OperationEntry.now(path="/b.jpg", action="permanent", result="error",
-                                detail="boom", size=50))
+    h.record(
+        OperationEntry.now(
+            path="/b.jpg", action="permanent", result="error", detail="boom", size=50
+        )
+    )
     rows = h.recent()
     assert len(rows) == 2
     assert rows[0].path == "/b.jpg" and rows[0].result == "error" and rows[0].detail == "boom"
@@ -19,9 +22,9 @@ def test_record_and_recent(tmp_path):
 def test_persist_and_clear(tmp_path):
     db = tmp_path / "h.sqlite3"
     h = OperationHistory(db)
-    h.record_many([
-        OperationEntry.now(path=f"/f{i}", action="trash", result="ok") for i in range(5)
-    ])
+    h.record_many(
+        [OperationEntry.now(path=f"/f{i}", action="trash", result="ok") for i in range(5)]
+    )
     h.close()
 
     h2 = OperationHistory(db)

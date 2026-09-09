@@ -9,14 +9,15 @@ Levels of evidence (kept separate, per requirement 12):
 Only a few frames are sampled (default 5), so a match is always reported as
 "probable", never certain.
 """
+
 from __future__ import annotations
 
 import json
 import re
 import subprocess
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from statistics import mean
-from typing import Callable, Optional
 
 from app.core.ffmpeg import FfmpegTools, _no_window
 from app.core.perceptual import hamming, perceptual_hash_bytes, similarity_percent
@@ -40,8 +41,8 @@ class VideoInfo:
     bitrate: int = 0
     has_audio: bool = False
     audio_codec: str = ""
-    creation_time: Optional[str] = None
-    error: Optional[str] = None
+    creation_time: str | None = None
+    error: str | None = None
 
     @property
     def resolution(self) -> tuple[int, int]:
@@ -64,15 +65,19 @@ def probe_video(path: str, tools: FfmpegTools) -> VideoInfo:
 
 
 def _run(cmd: list[str], timeout: int) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        cmd, capture_output=True, timeout=timeout, creationflags=_no_window()
-    )
+    return subprocess.run(cmd, capture_output=True, timeout=timeout, creationflags=_no_window())
 
 
 def _probe_with_ffprobe(path: str, ffprobe: str) -> VideoInfo:
     cmd = [
-        ffprobe, "-v", "quiet", "-print_format", "json",
-        "-show_format", "-show_streams", extended_path(path),
+        ffprobe,
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        extended_path(path),
     ]
     try:
         result = _run(cmd, _PROBE_TIMEOUT)
@@ -105,9 +110,7 @@ def _probe_with_ffprobe(path: str, ffprobe: str) -> VideoInfo:
 
 _DUR_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)")
 _BITRATE_RE = re.compile(r"bitrate:\s*(\d+)\s*kb/s")
-_VIDEO_RE = re.compile(
-    r"Stream #\d+:\d+.*?: Video:\s*([\w0-9]+).*?(\d{2,5})x(\d{2,5})", re.DOTALL
-)
+_VIDEO_RE = re.compile(r"Stream #\d+:\d+.*?: Video:\s*([\w0-9]+).*?(\d{2,5})x(\d{2,5})", re.DOTALL)
 _FPS_RE = re.compile(r"([\d.]+)\s*fps")
 _AUDIO_RE = re.compile(r"Stream #\d+:\d+.*?: Audio:\s*([\w0-9]+)")
 _CREATION_RE = re.compile(r"creation_time\s*:\s*(\S+)")
@@ -115,7 +118,9 @@ _CREATION_RE = re.compile(r"creation_time\s*:\s*(\S+)")
 
 def _probe_with_ffmpeg(path: str, ffmpeg: str) -> VideoInfo:
     try:
-        result = _run([ffmpeg, "-nostdin", "-hide_banner", "-i", extended_path(path)], _PROBE_TIMEOUT)
+        result = _run(
+            [ffmpeg, "-nostdin", "-hide_banner", "-i", extended_path(path)], _PROBE_TIMEOUT
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         return VideoInfo(error=f"ffmpeg falló: {exc}")
     text = (result.stderr or b"").decode("utf-8", "replace")
@@ -159,13 +164,13 @@ def extract_frame_hashes(
     info: VideoInfo,
     *,
     positions: tuple[float, ...] = FRAME_POSITIONS,
-    check: Optional[Callable[[], bool]] = None,
-) -> list[Optional[int]]:
+    check: Callable[[], bool] | None = None,
+) -> list[int | None]:
     """Sample one frame at each relative position and return its pHash.
     Entries are ``None`` where a frame could not be grabbed."""
     if not tools.ffmpeg or not info.ok:
         return []
-    hashes: list[Optional[int]] = []
+    hashes: list[int | None] = []
     for pos in positions:
         if check is not None and not check():
             break
@@ -175,12 +180,26 @@ def extract_frame_hashes(
     return hashes
 
 
-def _grab_frame_png(path: str, ffmpeg: str, timestamp: float) -> Optional[bytes]:
+def _grab_frame_png(path: str, ffmpeg: str, timestamp: float) -> bytes | None:
     cmd = [
-        ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
-        "-ss", f"{timestamp:.3f}", "-i", extended_path(path),
-        "-frames:v", "1", "-vf", "scale=320:-2",
-        "-f", "image2pipe", "-vcodec", "png", "-",
+        ffmpeg,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-ss",
+        f"{timestamp:.3f}",
+        "-i",
+        extended_path(path),
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=320:-2",
+        "-f",
+        "image2pipe",
+        "-vcodec",
+        "png",
+        "-",
     ]
     try:
         result = _run(cmd, _FRAME_TIMEOUT)
@@ -190,14 +209,10 @@ def _grab_frame_png(path: str, ffmpeg: str, timestamp: float) -> Optional[bytes]
     return result.stdout if result.returncode == 0 and result.stdout else None
 
 
-def compare_frame_hashes(
-    a: list[Optional[int]], b: list[Optional[int]]
-) -> Optional[float]:
+def compare_frame_hashes(a: list[int | None], b: list[int | None]) -> float | None:
     """Average per-position perceptual similarity, or ``None`` if there is not
     enough overlap to judge."""
-    pairs = [
-        (x, y) for x, y in zip(a, b) if x is not None and y is not None
-    ]
+    pairs = [(x, y) for x, y in zip(a, b) if x is not None and y is not None]
     if len(pairs) < 2:
         return None
     sims = [similarity_percent(hamming(x, y)) for x, y in pairs]
@@ -205,14 +220,14 @@ def compare_frame_hashes(
 
 
 # ---------------------------------------------------------------------------
-def encode_frame_hashes(hashes: list[Optional[int]]) -> str:
+def encode_frame_hashes(hashes: list[int | None]) -> str:
     return ",".join("-" if h is None else f"{h:016x}" for h in hashes)
 
 
-def decode_frame_hashes(text: Optional[str]) -> list[Optional[int]]:
+def decode_frame_hashes(text: str | None) -> list[int | None]:
     if not text:
         return []
-    out: list[Optional[int]] = []
+    out: list[int | None] = []
     for token in text.split(","):
         token = token.strip()
         if token in ("", "-"):

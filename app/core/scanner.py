@@ -12,13 +12,14 @@ Design notes
 * Unicode names and paths with spaces are handled natively via ``os.scandir``.
 * The scanner only ever *reads* metadata. It never opens file contents.
 """
+
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Iterable, Optional
 
 from app.utils.control import RunController
 from app.utils.file_utils import extended_path
@@ -26,13 +27,38 @@ from app.utils.file_utils import extended_path
 # Extension tables. The architecture allows adding formats later - just extend
 # these sets (and, for real decoding support, install the matching library).
 IMAGE_EXTENSIONS = {
-    ".jpg", ".jpeg", ".jpe", ".jfif",
-    ".png", ".webp", ".gif", ".bmp", ".dib",
-    ".tif", ".tiff", ".heic", ".heif", ".avif",
+    ".jpg",
+    ".jpeg",
+    ".jpe",
+    ".jfif",
+    ".png",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".dib",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+    ".avif",
 }
 VIDEO_EXTENSIONS = {
-    ".mp4", ".m4v", ".mov", ".avi", ".mkv", ".wmv", ".webm",
-    ".mpeg", ".mpg", ".mpe", ".3gp", ".3g2", ".m2ts", ".mts", ".ts", ".flv",
+    ".mp4",
+    ".m4v",
+    ".mov",
+    ".avi",
+    ".mkv",
+    ".wmv",
+    ".webm",
+    ".mpeg",
+    ".mpg",
+    ".mpe",
+    ".3gp",
+    ".3g2",
+    ".m2ts",
+    ".mts",
+    ".ts",
+    ".flv",
 }
 
 
@@ -76,10 +102,15 @@ class ScanStats:
     excluded_folders: int = 0
     issues: list[ScanIssue] = field(default_factory=list)
 
-    def snapshot(self) -> "ScanStats":
+    def snapshot(self) -> ScanStats:
         return ScanStats(
-            self.files_found, self.images, self.videos, self.others,
-            self.total_size, self.folders_scanned, self.excluded_folders,
+            self.files_found,
+            self.images,
+            self.videos,
+            self.others,
+            self.total_size,
+            self.folders_scanned,
+            self.excluded_folders,
             list(self.issues),
         )
 
@@ -91,9 +122,7 @@ class ScanOptions:
     ignored_extensions: frozenset[str] = frozenset()
     excluded_dir_names: frozenset[str] = frozenset()
     excluded_paths: frozenset[str] = frozenset()
-    include_kinds: frozenset[FileKind] = frozenset(
-        {FileKind.IMAGE, FileKind.VIDEO, FileKind.OTHER}
-    )
+    include_kinds: frozenset[FileKind] = frozenset({FileKind.IMAGE, FileKind.VIDEO, FileKind.OTHER})
 
     @staticmethod
     def normalise_ext(exts: Iterable[str]) -> frozenset[str]:
@@ -115,20 +144,18 @@ class Scanner:
     def __init__(
         self,
         root: str | os.PathLike[str],
-        options: Optional[ScanOptions] = None,
-        controller: Optional[RunController] = None,
+        options: ScanOptions | None = None,
+        controller: RunController | None = None,
     ) -> None:
         self.root = Path(root)
         self.options = options or ScanOptions()
         self.controller = controller or RunController()
-        self._excluded_real = {
-            os.path.realpath(p) for p in self.options.excluded_paths
-        }
+        self._excluded_real = {os.path.realpath(p) for p in self.options.excluded_paths}
 
     def scan(
         self,
-        on_file: Optional[OnFile] = None,
-        on_progress: Optional[OnProgress] = None,
+        on_file: OnFile | None = None,
+        on_progress: OnProgress | None = None,
         progress_every: int = 200,
     ) -> ScanStats:
         stats = ScanStats()
@@ -155,7 +182,9 @@ class Scanner:
                     continue
                 visited.add(key)
             except OSError as exc:
-                stats.issues.append(ScanIssue(current, f"No se pudo acceder: {exc.strerror or exc}"))
+                stats.issues.append(
+                    ScanIssue(current, f"No se pudo acceder: {exc.strerror or exc}")
+                )
                 continue
 
             try:
@@ -164,7 +193,9 @@ class Scanner:
                 stats.issues.append(ScanIssue(current, "Permisos insuficientes."))
                 continue
             except OSError as exc:
-                stats.issues.append(ScanIssue(current, f"No se pudo leer la carpeta: {exc.strerror or exc}"))
+                stats.issues.append(
+                    ScanIssue(current, f"No se pudo leer la carpeta: {exc.strerror or exc}")
+                )
                 continue
 
             stats.folders_scanned += 1
@@ -192,7 +223,7 @@ class Scanner:
         entry: os.DirEntry,
         stack: list[str],
         stats: ScanStats,
-        on_file: Optional[OnFile],
+        on_file: OnFile | None,
     ) -> None:
         opts = self.options
 

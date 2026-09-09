@@ -15,7 +15,7 @@ def _img(path, size=(50, 40), color=(120, 30, 200), fmt=None):
 
 def test_same_pixels_different_container_same_digest(tmp_path):
     a = _img(tmp_path / "a.png")
-    b = _img(tmp_path / "b.bmp")          # different format, lossless, same pixels
+    b = _img(tmp_path / "b.bmp")  # different format, lossless, same pixels
     da, _ = pixel_digest(str(a))
     db, _ = pixel_digest(str(b))
     assert da == db
@@ -41,7 +41,7 @@ def test_exif_orientation_normalised(tmp_path):
     """A landscape image tagged 'rotate 90' has the same normalised pixels as
     the same image physically rotated."""
     base = Image.new("RGB", (60, 30), (5, 5, 5))
-    base.putpixel((0, 0), (255, 0, 0))       # asymmetric marker
+    base.putpixel((0, 0), (255, 0, 0))  # asymmetric marker
 
     tagged = tmp_path / "tagged.jpg"
     exif = base.getexif()

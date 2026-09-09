@@ -4,6 +4,7 @@ Can hold a whole group: navigate ◀ ▶ between the images while zoomed in, and
 take the keep / delete decision right there. The full image is loaded only
 when shown and released when the dialog closes.
 """
+
 from __future__ import annotations
 
 import os
@@ -32,7 +33,7 @@ class _ZoomView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setRenderHints(self.renderHints())
 
-    def wheelEvent(self, event) -> None:  # noqa: N802
+    def wheelEvent(self, event) -> None:
         self.scale(*(1.25, 1.25) if event.angleDelta().y() > 0 else (0.8, 0.8))
 
     def reset_zoom(self) -> None:
@@ -161,9 +162,7 @@ class ImageViewerDialog(QDialog):
             extra = ""
             if rec.similarity_percent is not None:
                 extra = f"   ·   similitud {rec.similarity_percent:.1f}%"
-            self._info.setText(
-                f"{pm.width()} × {pm.height()} px   ·   {fsize}{extra}\n{rec.path}"
-            )
+            self._info.setText(f"{pm.width()} × {pm.height()} px   ·   {fsize}{extra}\n{rec.path}")
             self.fit()
         self._refresh_decision_row()
 

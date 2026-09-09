@@ -11,6 +11,7 @@ clear WCAG AA (>= 4.5:1 for body, >= 3:1 for the large/secondary cases)
 against their background. Muted text uses a dedicated colour, *not* the border
 colour, so borders can stay subtle without making captions unreadable.
 """
+
 from __future__ import annotations
 
 from PySide6.QtGui import QColor, QPalette
@@ -158,21 +159,21 @@ def _palette(theme: str) -> QPalette:
         window = QColor("#1e1f22")
         base = QColor("#2b2d31")
         alt = QColor("#34373e")
-        text = QColor("#e8e9ec")            # ~13:1 on window
+        text = QColor("#e8e9ec")  # ~13:1 on window
         button = QColor("#34373e")
-        border = QColor("#4b4f57")          # subtle border, NOT used for text
-        muted = QColor("#a9afb8")           # ~6.5:1 on window  (hint / placeholder)
-        disabled = QColor("#7f858e")        # ~4.6:1 on window
+        border = QColor("#4b4f57")  # subtle border, NOT used for text
+        muted = QColor("#a9afb8")  # ~6.5:1 on window  (hint / placeholder)
+        disabled = QColor("#7f858e")  # ~4.6:1 on window
         link = QColor("#7cb4ff")
     else:
         window = QColor("#f4f5f7")
         base = QColor("#ffffff")
         alt = QColor("#e9ebef")
-        text = QColor("#1c1f24")            # ~14:1 on window
+        text = QColor("#1c1f24")  # ~14:1 on window
         button = QColor("#ffffff")
-        border = QColor("#cdd2da")          # subtle border, NOT used for text
-        muted = QColor("#586069")           # ~5.7:1 on window, ~6.4:1 on white
-        disabled = QColor("#727984")        # ~4.5:1 on window
+        border = QColor("#cdd2da")  # subtle border, NOT used for text
+        muted = QColor("#586069")  # ~5.7:1 on window, ~6.4:1 on white
+        disabled = QColor("#727984")  # ~4.5:1 on window
         link = QColor("#1a56db")
 
     p = QPalette()
@@ -194,8 +195,7 @@ def _palette(theme: str) -> QPalette:
     p.setColor(QPalette.HighlightedText, QColor("#ffffff"))
     p.setColor(QPalette.Link, link)
 
-    for role in (QPalette.Text, QPalette.WindowText, QPalette.ButtonText,
-                 QPalette.PlaceholderText):
+    for role in (QPalette.Text, QPalette.WindowText, QPalette.ButtonText, QPalette.PlaceholderText):
         p.setColor(QPalette.Disabled, role, disabled)
     return p
 

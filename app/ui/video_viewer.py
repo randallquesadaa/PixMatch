@@ -3,6 +3,7 @@ the key metadata for each, plus the estimated content similarity.
 
 Read-only. Playback is delegated to the OS default player.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -82,9 +83,7 @@ class _VideoColumn(QWidget):
         layout.addLayout(btns)
         layout.addStretch(1)
 
-        request_thumbnail(
-            record.path, record.size, record.mtime, _FRAME_EDGE, self._on_frame
-        )
+        request_thumbnail(record.path, record.size, record.mtime, _FRAME_EDGE, self._on_frame)
 
     def _on_frame(self, path: str, pixmap: object) -> None:
         if path != self.record.path:
@@ -110,9 +109,7 @@ class VideoCompareDialog(QDialog):
             if rec is anchor:
                 sim: float | None = 100.0
             else:
-                sim = compare_frame_hashes(
-                    rec.frame_hashes or [], anchor.frame_hashes or []
-                )
+                sim = compare_frame_hashes(rec.frame_hashes or [], anchor.frame_hashes or [])
             grid.addWidget(_VideoColumn(rec, sim), 0, col)
 
         scroll = QScrollArea()

@@ -3,6 +3,7 @@
 Technical errors go to a rotating log file (viewable from
 Settings -> Logs), not to the user interface.
 """
+
 from __future__ import annotations
 
 import logging

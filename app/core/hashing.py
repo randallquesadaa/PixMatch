@@ -6,16 +6,17 @@
   avoid full hashes for files that obviously differ. Never used on its own to
   declare a duplicate.
 """
+
 from __future__ import annotations
 
 import hashlib
 import os
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from app.utils.file_utils import extended_path
 
 _CHUNK = 1 << 20  # 1 MiB
-CheckFn = Optional[Callable[[], bool]]
+CheckFn = Callable[[], bool] | None
 
 
 class HashCancelled(Exception):
