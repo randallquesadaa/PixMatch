@@ -1,21 +1,29 @@
 version: 2
 updates:
+  # ---- Python packages (requirements.txt + pyproject.toml) ----
   - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
-    groups:
-      dev-dependencies:
-        patterns: ["ruff", "bandit", "pip-audit", "pytest*", "pyinstaller"]
-      runtime-dependencies:
-        patterns: ["PySide6", "Pillow", "Send2Trash"]
     labels: ["dependencies"]
+    groups:
+      # the 3 real runtime dependencies of the app - review these carefully
+      runtime:
+        patterns: ["PySide6", "Pillow", "Send2Trash"]
+      # dev tools + optional extras ([ai], [video], [heif], [avif]) in one PR
+      dev-and-optional:
+        patterns: ["*"]
+        exclude-patterns: ["PySide6", "Pillow", "Send2Trash"]
 
+  # ---- GitHub Actions used by the workflows ----
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
       day: monday
     labels: ["dependencies", "ci"]
+    groups:
+      github-actions:
+        patterns: ["*"]

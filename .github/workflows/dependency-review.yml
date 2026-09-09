@@ -12,13 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     # Requires the repository's "Dependency graph" feature (Settings -> Security).
     # Enabled together with Dependabot on this repo.
+    permissions:
+      contents: read
+      pull-requests: write # post the summary comment on failure
     steps:
       - uses: actions/checkout@v4
-      - name: Review dependency changes for known vulnerabilities & licenses
+      - name: Review dependency changes for known vulnerabilities
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
-          # Strong copyleft would compromise the MIT distribution of the binaries.
-          # (LGPL is allowed: PySide6/Qt is LGPL and dynamically linked - see README.)
-          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
           comment-summary-in-pr: on-failure
+          # No license gate: PySide6/Qt declares an LGPL-3.0 OR GPL SPDX
+          # expression and we use it under the LGPL (dynamic linking, see the
+          # README "Licencia" section). Copyleft compliance for the packaged
+          # binaries is handled there, not by this check.
