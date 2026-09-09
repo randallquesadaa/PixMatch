@@ -10,9 +10,9 @@
 # Later phases add: send2trash (recycle bin, Phase 3) and FFmpeg-based video
 # analysis (Phase 4; FFmpeg is an external binary, not a pip package).
 
-PySide6>=6.6,<7
-Pillow>=10.2      # note: getbbox(alpha_only=...) is used, needs Pillow >= 9.2
-Send2Trash>=1.8  # Phase 3 - move files to the OS recycle bin (never a plain delete)
+PySide6>=6.11.2,<7
+Pillow>=12.3.0      # note: getbbox(alpha_only=...) is used, needs Pillow >= 9.2
+Send2Trash>=2.1.0  # Phase 3 - move files to the OS recycle bin (never a plain delete)
 
 # --- optional, enabled automatically when present ---
 # Video analysis (Phase 4) needs FFmpeg. Preferred: install the system FFmpeg
