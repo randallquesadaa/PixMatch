@@ -35,6 +35,8 @@ from app.database.history import OperationHistory
 from app.i18n import tr
 from app.ui.deletion_dialog import DeletionConfirmDialog, HistoryDialog
 from app.ui.duplicate_view import DuplicateView
+from app.ui.import_view import ImportView
+from app.ui.organize_view import OrganizeView
 from app.ui.rename_view import RenameView
 from app.ui.settings_dialog import SettingsDialog
 from app.ui.theme import apply_theme
@@ -165,9 +167,17 @@ class MainWindow(QMainWindow):
         self.rename_view = RenameView(self.config, self.history)
         self.rename_view.status_message.connect(lambda m: self.statusBar().showMessage(m, 6000))
 
+        self.import_view = ImportView(self.config, self.history)
+        self.import_view.status_message.connect(lambda m: self.statusBar().showMessage(m, 6000))
+
+        self.organize_view = OrganizeView(self.config, self.history)
+        self.organize_view.status_message.connect(lambda m: self.statusBar().showMessage(m, 6000))
+
         self.tabs = QTabWidget()
         self.tabs.addTab(self.stack, "🔍  Duplicados")
         self.tabs.addTab(self.rename_view, "✏️  Renombrar por fecha")
+        self.tabs.addTab(self.import_view, "📥  Importar y organizar")
+        self.tabs.addTab(self.organize_view, "🗂️  Organizar biblioteca")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.setCentralWidget(self.tabs)
 
@@ -328,14 +338,18 @@ class MainWindow(QMainWindow):
         self._refresh_toolbar_state()
         if hasattr(self, "rename_view"):
             self.rename_view.set_folder(folder)
+        if hasattr(self, "import_view"):
+            self.import_view.set_source_folder(folder)
         self.statusBar().showMessage(f"Carpeta lista: {folder}. Pulsa «Analizar».", 6000)
 
     def _on_tab_changed(self, index: int) -> None:
         on_dupes = index == 0
         for a in (self.act_analyze, self.act_analyze_full, self.act_pause, self.act_cancel):
             a.setVisible(on_dupes)
-        if not on_dupes and self._folder and not self.rename_view._folder:
+        if index == 1 and self._folder and not self.rename_view._folder:
             self.rename_view.set_folder(self._folder)
+        if index == 2 and self._folder:
+            self.import_view.set_source_folder(self._folder)
 
     def _update_folder_label(self) -> None:
         self.folder_label.setText(
@@ -806,6 +820,10 @@ class MainWindow(QMainWindow):
             self._deletion.wait()
         if hasattr(self, "rename_view"):
             self.rename_view.shutdown()
+        if hasattr(self, "import_view"):
+            self.import_view.shutdown()
+        if hasattr(self, "organize_view"):
+            self.organize_view.shutdown()
         self.history.close()
         self.config.save()
         super().closeEvent(event)

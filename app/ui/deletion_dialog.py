@@ -172,6 +172,9 @@ class HistoryDialog(QDialog):
             "trash": "papelera",
             "permanent": "eliminación permanente",
             "rename": "renombrado",
+            "import": "importación",
+            "import-dupe": "duplicado enviado a la papelera",
+            "organize": "reorganización",
         }
         for i, e in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(e.ts))

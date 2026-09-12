@@ -24,7 +24,10 @@ ICON_PNG = str(ROOT / "packaging" / "resources" / "icon.png")
 ICON_ICO = str(ROOT / "packaging" / "resources" / "icon.ico")
 ICON_ICNS = str(ROOT / "packaging" / "resources" / "icon.icns")
 
-datas = [(str(ROOT / "packaging" / "resources" / "icon.png"), "resources")]
+datas = [
+    (str(ROOT / "packaging" / "resources" / "icon.png"), "resources"),
+    (str(ROOT / "app" / "resources" / "country_borders.json"), "app/resources"),
+]
 binaries = []
 hiddenimports = ["app"]
 

@@ -59,7 +59,7 @@ pixmatch-cli = "app.main:main"
 packages = ["app", "app.core", "app.database", "app.ui", "app.ui.widgets", "app.workers", "app.utils"]
 
 [tool.setuptools.package-data]
-app = ["../packaging/resources/*.png"]
+app = ["../packaging/resources/*.png", "resources/*.json"]
 
 # ─────────────────────────── tests ───────────────────────────
 [tool.pytest.ini_options]

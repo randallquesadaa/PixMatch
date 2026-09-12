@@ -32,8 +32,64 @@ def test_main_window_constructs(qapp):
 
     win = MainWindow(AppConfig())
     assert win.windowTitle().startswith("PixMatch")
-    assert win.tabs.count() == 2  # Duplicados + Renombrar
+    assert win.tabs.count() == 4  # Duplicados + Renombrar + Importar + Organizar
     win.close()
+
+
+def test_import_view_preview_populates_table(qapp, tmp_path):
+    from datetime import datetime
+
+    from PIL import Image
+
+    from app.core.geo import CountryResolver
+    from app.core.importer import LibraryIndex, build_import_plan
+    from app.core.scanner import FileKind, ScannedFile
+    from app.database.history import OperationHistory
+    from app.ui.import_view import ImportView
+
+    src = tmp_path / "phone"
+    lib = tmp_path / "library"
+    src.mkdir()
+    lib.mkdir()
+
+    def photo(name, dt):
+        p = src / name
+        img = Image.new("RGB", (20, 15), (30, 90, 160))
+        exif = img.getexif()
+        exif.get_ifd(0x8769)[0x9003] = dt.strftime("%Y:%m:%d %H:%M:%S")
+        g = exif.get_ifd(0x8825)
+        g[1], g[2] = "N", (9.0, 55.0, 41.16)
+        g[3], g[4] = "W", (84.0, 5.0, 26.4)
+        img.save(p, exif=exif)
+        return p
+
+    photo("IMG_1.jpg", datetime(2023, 5, 14, 14, 30, 5))
+
+    hist = OperationHistory(tmp_path / "h.sqlite3")
+    view = ImportView(AppConfig(use_cache=False), hist)
+    view._source, view._library = str(src), str(lib)
+
+    def sf(p):
+        st = p.stat()
+        return ScannedFile(path=str(p), size=st.st_size, mtime=st.st_mtime, kind=FileKind.IMAGE)
+
+    idx = LibraryIndex(str(lib))
+    idx.build([])
+    idx.prepare_dims()
+    view._plans = build_import_plan(
+        [sf(src / "IMG_1.jpg")],
+        library_root=str(lib),
+        index=idx,
+        resolver=CountryResolver(),
+        config=view.config,
+    )
+    view._repopulate_table()
+    assert view.table.rowCount() == 1
+    assert view._plans[0].country == "Costa Rica"
+    assert view.move_btn.isEnabled()
+
+    hist.close()
+    view.deleteLater()
 
 
 def test_rename_view_preview_and_apply(qapp, tmp_path):
