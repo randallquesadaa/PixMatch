@@ -32,7 +32,7 @@ Desktop tool for photo and video libraries. It has four tabs:
 > when source and destination are on the same drive, the common case): if
 > anything fails, the original is left untouched.
 
-Current status: **v0.7.0** — full duplicate analysis + rename tool +
+Current status: **v0.8.0** — full duplicate analysis + rename tool +
 import/organize + library reorganization. See [`ROADMAP.md`](ROADMAP.md) for
 the architecture, technical decisions and known limitations.
 
