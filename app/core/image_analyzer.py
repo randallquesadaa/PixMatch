@@ -85,7 +85,8 @@ def difference_image(
 ) -> Image.Image | None:
     """An RGB image highlighting where A and B differ (B is resized to A).
 
-    For the "Comparación avanzada" view. Returns ``None`` on failure.
+    For the "Comparar en detalle" (advanced compare) view. Returns ``None``
+    on failure.
     """
     try:
         with Image.open(extended_path(path_a)) as a, Image.open(extended_path(path_b)) as b:

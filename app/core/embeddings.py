@@ -1,6 +1,8 @@
 """Optional visual-embedding backend (CLIP-style).
 
-This is an *opt-in* enhancement (Settings -> "Detección avanzada mediante IA").
+This is an *opt-in* enhancement (Settings -> "Detección avanzada mediante IA",
+i.e. "AI-assisted detection" -- the checkbox label, which stays in the UI's
+Spanish source language).
 It compares a learned visual representation of each image rather than its
 pixels, so it can link the same scene / composition even across crops,
 re-framing or shots taken seconds apart.

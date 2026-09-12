@@ -10,8 +10,9 @@ weighted average is the reported score. The weights are configurable
     colour histogram         10 %
     bHash (composition)      20 %
 
-The engine also returns human-readable *reasons* ("por qué se agruparon") and,
-where relevant, an *upgraded category* (RESIZED_DUPLICATE / CROPPED_SIMILAR).
+The engine also returns human-readable *reasons* ("why they were grouped")
+and, where relevant, an *upgraded category* (RESIZED_DUPLICATE /
+CROPPED_SIMILAR).
 """
 
 from __future__ import annotations

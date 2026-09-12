@@ -5,219 +5,290 @@
 [![Release](https://img.shields.io/github/v/release/randallquesadaa/PixMatch?sort=semver)](https://github.com/randallquesadaa/PixMatch/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Herramienta de escritorio para bibliotecas de fotos y vídeos. Tiene dos
-pestañas:
+Desktop tool for photo and video libraries. It has four tabs:
 
-- **Duplicados** — encuentra archivos duplicados y casi-duplicados (idénticos,
-  pixel-idénticos, redimensionados, recortes, similares) en una carpeta y sus
-  subcarpetas, con comparación lado a lado, y deja que **tú** decidas qué
-  conservar.
-- **Renombrar por fecha** — pone orden en la nomenclatura: renombra a
-  `AAAAMMDD_HHMMSS.ext` según los metadatos EXIF (o la fecha de modificación).
+- **Duplicates** — finds duplicate and near-duplicate files (identical,
+  pixel-identical, resized, cropped, similar) in a folder and its
+  subfolders, with a side-by-side comparison, and lets **you** decide what
+  to keep.
+- **Rename by date** — cleans up file naming: renames to
+  `YYYYMMDD_HHMMSS.ext` from EXIF metadata (or the modification date).
+- **Import & organize** — moves photos / videos from a source folder (a
+  phone, a memory card) into your ordered library
+  `<Country>/<Year>/<Year-Month>/`, named by date, skipping what is **already
+  there** (identical SHA-256 or identical pixels). The country comes from the
+  file's own **GPS**, offline; no GPS goes to "No location".
+- **Organize library** — rearranges a **single, already-existing folder** (an
+  old drive, an unsorted dump) into that same structure, in place. It
+  compares and evaluates nothing: every file moves to where it belongs, or is
+  left alone if it's already there.
 
-> **Nada se elimina, mueve ni renombra sin una acción explícita y confirmada.**
-> El análisis de duplicados es de solo lectura. Borrar (papelera por defecto,
-> permanente como modo aparte) y renombrar requieren confirmación, quedan en un
-> historial consultable y el renombrado se puede deshacer.
+> **Nothing is deleted, moved or renamed without an explicit, confirmed
+> action.** Duplicate analysis is read-only. Deleting (recycle bin by
+> default, permanent as a separate mode), renaming, importing and organizing
+> all require confirmation, are logged to an inspectable history, and can be
+> undone. When importing or organizing, a move is *copy → verify SHA-256 at
+> the destination → remove the source* (organizing uses an atomic rename
+> when source and destination are on the same drive, the common case): if
+> anything fails, the original is left untouched.
 
-Estado actual: **v0.7.0** — análisis de duplicados completo + herramienta de
-renombrado. Ver [`ROADMAP.md`](ROADMAP.md) para la arquitectura, las decisiones
-técnicas y las limitaciones conocidas.
+Current status: **v0.7.0** — full duplicate analysis + rename tool +
+import/organize + library reorganization. See [`ROADMAP.md`](ROADMAP.md) for
+the architecture, technical decisions and known limitations.
 
 ---
 
-## Qué hace
+## What it does
 
-- Selección de carpeta (botón o **arrastrar y soltar** la carpeta a la ventana).
-- Escaneo recursivo sin límite de profundidad:
-  - ignora enlaces simbólicos de carpeta para evitar ciclos (configurable),
-  - maneja nombres Unicode y con espacios,
-  - los errores de permisos o archivos ilegibles se registran y **no**
-    detienen el análisis,
-  - exclusión de carpetas por nombre o ruta (siempre explícita, nunca
-    automática), tamaño mínimo y extensiones ignoradas.
-- Estadísticas en vivo: archivos, imágenes, videos, otros, tamaño total,
-  carpetas analizadas.
-- Detección de **duplicados exactos** (Fase 1):
-  - agrupación previa por tamaño (solo optimización),
-  - **SHA-256** completo de los candidatos,
-  - dos o más archivos con el mismo SHA-256 → un grupo `ARCHIVO IDÉNTICO`.
-  - Un grupo de 3, 4, … archivos es **un solo grupo**, no varios pares.
-- Detección **pixel por pixel** (Fase 2):
-  - se decodifican solo los candidatos con **dimensiones coincidentes**,
-  - orientación EXIF normalizada **en memoria** (el archivo no se toca),
-  - RGB opaco y RGBA opaco se consideran iguales,
-  - archivos con **bytes distintos** pero **píxeles idénticos** (p. ej. PNG vs
-    BMP, o el mismo PNG con/sin metadatos) → grupo `PIXEL POR PIXEL IDÉNTICO`,
-    claramente distinto de `ARCHIVO IDÉNTICO`.
-- Detección **inteligente de imágenes similares** (Fase 6, *opcional* — se
-  activa en Configuración):
-  - **motor de puntuación combinado y configurable**: pHash 40 % + dHash 20 % +
-    aHash 10 % + **histograma de color** 10 % + **hash de composición** (bloques
-    16×16) 20 %. El histograma de color y el hash de composición son lo que
-    **impide agrupar dos fotos distintas solo porque tienen colores parecidos**
-    (p. ej. dos atardeceres diferentes),
-  - **bandas de score configurables** (visualmente idéntico ≥ 98 %, muy similar
-    ≥ 90 %, similar ≥ 78 %; por debajo no se agrupa) y **sensibilidad**
-    Baja / Media / Alta / Personalizada,
-  - categorías propias: `VISUALMENTE IDÉNTICO`, `REDIMENSIONADO` (misma imagen a
-    otra resolución), `RECORTE` (una imagen es un encuadre parcial de otra —
-    solo en sensibilidad Alta), `MUY SIMILAR`, `SIMILAR`,
-  - tolera brillo / contraste / desenfoque / ruido / recompresión,
-  - **agrupación N-aria** con **lista de relación** por archivo
-    (`small 98.7 % · crop 93.4 %`) y **"Se agruparon porque: ✓ …"**,
-  - **"Comparar en detalle"** con modos **Normal / Lado a lado / Diferencia /
-    Superposición** (con slider de opacidad),
-  - **Detección avanzada mediante IA** (embeddings visuales CLIP) — *opcional*,
-    `pip install "pixmatch[ai]"`; si no está instalada se usan solo
-    los métodos tradicionales.
-- **Análisis de vídeo** (Fase 4, *opcional* — necesita **FFmpeg**):
-  - detección automática de FFmpeg/ffprobe (PATH → `imageio-ffmpeg`), con
-    **ruta configurable** y botón "Comprobar FFmpeg" en Configuración; si no
-    hay FFmpeg la app lo dice y sigue con las imágenes,
-  - vídeos con el **mismo SHA-256** → `ARCHIVO IDÉNTICO`,
-  - metadatos (duración, resolución, códec, FPS, bitrate, audio, fecha) por
-    ffprobe o, si no está, parseando `ffmpeg -i`,
-  - **comparación escalonada de fotogramas**: se muestrean 5 fotogramas
-    (5/25/50/75/95 %) de cada vídeo con duración parecida y se comparan sus
-    **pHash** → categorías `MISMO CONTENIDO PROBABLE` / `MUY SIMILAR` /
-    `SIMILAR` (nunca "idéntico" a partir de unos fotogramas),
-  - un vídeo, su copia byte-idéntica **y** su versión recomprimida acaban en
-    **un solo grupo** (la categoría refleja el enlace más débil),
-  - miniatura de vídeo (un fotograma), y **"🎬 Comparar vídeos"**: fotograma
-    representativo + metadatos + similitud estimada por cada vídeo.
-- **Caché SQLite** con **análisis incremental** (Fase 2):
-  - guarda hash, pixel-hash, hashes perceptuales, metadatos y datos de vídeo
-    (fotogramas incluidos) por archivo,
-  - un archivo cuyo tamaño y fecha no cambiaron **no se vuelve a procesar**,
-  - botón **"Analizar"** = incremental; **"↻ Análisis completo"** = recalcula
-    todo. Si la base de datos se corrompe, el análisis sigue sin caché.
-- Vista de duplicados:
-  - filtros (Todas / Imágenes / Videos / Archivo idéntico / Pixel idéntico /
-    Similares / Sin revisar / Revisados / Marcados para eliminar),
-  - orden (ahorro / nº duplicados / tamaño / **similitud** / nombre / ruta),
-    búsqueda, "≥ N archivos por grupo",
-  - navegación Anterior / Siguiente + lista lateral de grupos con su categoría,
-  - comparación lado a lado con miniatura, nombre, ruta, tamaño, resolución,
-    formato, modo de color, orientación EXIF, cámara, fechas, SHA-256,
-    hash de píxeles, pHash y **% de similitud vs. la referencia del grupo**,
-  - por archivo: **🔍 Ampliar**, Abrir archivo, Abrir carpeta, Copiar ruta y
-    **🗑 Eliminar** (borra solo ese archivo, con confirmación e historial),
-  - **visor ampliado**: zoom (rueda / +/−) y pan, ajustar / tamaño original,
-    **◀ ▶ para recorrer todo el grupo** (o flechas del teclado) y decidir
-    *Mantener / Marcar / Eliminar ahora* mientras miras el detalle; respeta la
-    orientación EXIF **sin tocar el archivo**,
-  - **recomendación no vinculante** de cuál conservar, con puntuación
-    (`KEEP_SCORE`: resolución, tamaño, formato sin pérdidas, bitrate de vídeo,
-    metadatos EXIF/cámara/fecha, antigüedad, nombre "copia", carpeta
-    backup/temporal) y **porcentaje de confianza** — nunca preselecciona nada,
-  - indicador en vivo del espacio que se liberaría y aviso si una decisión
-    dejaría 0 copias.
-- **Eliminación segura** (Fase 3):
-  - checkbox "Mantener este archivo" + botones *Mantener seleccionados*,
-    *Eliminar no seleccionados*, *Mantener todos*, *Ignorar grupo* — todos
-    solo **marcan**; nada se borra hasta pulsar **"🗑 Eliminar archivos
-    marcados…"** y **confirmar**,
-  - por defecto los archivos se **mueven a la papelera del sistema**
-    (`Send2Trash`, recuperable); la eliminación permanente es un modo separado
-    con aviso en rojo,
-  - el diálogo de confirmación lista los archivos, el espacio a liberar y los
-    avisos (archivo que cambió desde el análisis, grupo que quedaría sin
-    ninguna copia → casilla obligatoria),
-  - re-verificación de cada archivo justo antes de borrarlo; un archivo que
-    cambió de tamaño o desapareció **se omite** y se informa,
-  - resumen post-operación ("Se movieron 37 archivos a la papelera. Espacio
-    recuperado: 8.72 GB"),
-  - **historial de operaciones** (Ayuda → Historial): fecha, archivo, acción,
-    resultado — incluidos los fallos,
-  - los archivos eliminados quedan visibles en gris ("ELIMINADO"); los grupos
-    resueltos pasan al filtro "Resueltos".
-- **Exportación** (Archivo → Exportar resultados): **CSV**, **JSON** y un
-  **informe HTML autocontenido** con miniaturas embebidas, rutas, hashes,
-  similitud y la decisión de cada archivo.
-- Dashboard de resultados: totales del escaneo, archivos decodificados / con
-  hash perceptual / reutilizados de caché, desglose por categoría, espacio
-  potencial recuperable y archivos eliminados en la sesión.
-- **Tema oscuro y claro** con contraste **WCAG AA** (el texto atenuado también),
-  estados de botón hover/pressed/focus/disabled visibles, y botones que se
-  deshabilitan cuando su acción no aplica.
-- **Idioma** ES / EN (Configuración → General). Español es el idioma base;
-  la traducción al inglés cubre la interfaz principal y se amplía fácilmente.
-- Análisis en segundo plano con **Pausar / Reanudar / Cancelar** (la pausa
-  detiene también las fases de decodificación); la interfaz nunca se congela.
-- Atajos de teclado: `←`/`→` grupo anterior/siguiente, `M` mantener, `D`
-  marcar para eliminar, `A` mantener todos, `I` ignorar, `Esc` volver.
-- Log rotativo en disco, consultable desde **Configuración → Logs**.
+- Folder selection (button, or **drag and drop** the folder onto the window).
+- Recursive scan with no depth limit:
+  - skips directory symlinks to avoid cycles (configurable),
+  - handles Unicode names and spaces,
+  - permission errors or unreadable files are logged and **do not** stop the
+    analysis,
+  - folder exclusion by name or path (always explicit, never automatic),
+    minimum size, and ignored extensions.
+- Live stats: files, images, videos, other, total size, folders scanned.
+- **Exact duplicate** detection:
+  - pre-grouping by size (an optimization only),
+  - full **SHA-256** of the candidates,
+  - two or more files sharing a SHA-256 → one `IDENTICAL FILE` group.
+  - A group of 3, 4, … files is **one group**, not several pairs.
+- **Pixel-by-pixel** detection:
+  - only candidates with **matching dimensions** are decoded,
+  - EXIF orientation normalized **in memory** (the file itself is untouched),
+  - opaque RGB and opaque RGBA are treated as equal,
+  - files with **different bytes** but **identical pixels** (e.g. PNG vs BMP,
+    or the same PNG with/without metadata) → `PIXEL-BY-PIXEL IDENTICAL`
+    group, clearly distinct from `IDENTICAL FILE`.
+- **Smart similar-image** detection (opt-in, enabled in Settings):
+  - **combined, configurable scoring engine**: pHash 40% + dHash 20% + aHash
+    10% + **color histogram** 10% + **layout hash** (16×16 blocks) 20%. The
+    color histogram and layout hash are what **stop two unrelated photos
+    from grouping just because their colors look alike** (e.g. two different
+    sunsets),
+  - **configurable score bands** (visually identical ≥ 98%, very similar
+    ≥ 90%, similar ≥ 78%; below that nothing groups) and **sensitivity**
+    Low / Medium / High / Custom,
+  - dedicated categories: `VISUALLY IDENTICAL`, `RESIZED` (same image at
+    another resolution), `CROPPED` (one image is a partial frame of another —
+    High sensitivity only), `VERY SIMILAR`, `SIMILAR`,
+  - tolerates brightness / contrast / blur / noise / recompression,
+  - **N-ary grouping** with a per-file **relation list**
+    (`small 98.7% · crop 93.4%`) and **"Grouped because: ✓ …"**,
+  - **"Compare in detail"** with **Normal / Side by side / Difference /
+    Overlay** modes (with an opacity slider),
+  - **AI-assisted detection** (CLIP visual embeddings) — optional,
+    `pip install "pixmatch[ai]"`; falls back to the traditional methods alone
+    when it isn't installed.
+- **Video analysis** (opt-in — needs **FFmpeg**):
+  - automatic FFmpeg/ffprobe detection (PATH → `imageio-ffmpeg`), with a
+    **configurable path** and a "Check FFmpeg" button in Settings; without
+    FFmpeg the app says so and continues with images,
+  - videos with the **same SHA-256** → `IDENTICAL FILE`,
+  - metadata (duration, resolution, codec, FPS, bitrate, audio, date) via
+    ffprobe or, failing that, by parsing `ffmpeg -i`,
+  - **staged frame comparison**: 5 frames (5/25/50/75/95%) are sampled from
+    each video of similar duration and compared by **pHash** →
+    `LIKELY SAME CONTENT` / `VERY SIMILAR` / `SIMILAR` categories (never
+    "identical" from a handful of frames),
+  - a video, its byte-identical copy, **and** its re-encoded version end up
+    in **one group** (the category reflects the weakest link),
+  - a video thumbnail (one frame), and **"🎬 Compare videos"**: a
+    representative frame + metadata + estimated similarity for each video.
+- **SQLite cache** with **incremental analysis**:
+  - stores the hash, pixel-hash, perceptual hashes, metadata and video data
+    (frames included) per file,
+  - a file whose size and date haven't changed **is never reprocessed**,
+  - the **"Analyze"** button is incremental; **"↻ Full analysis"** recomputes
+    everything. If the database is corrupted, analysis continues without a
+    cache.
+- Duplicates view:
+  - filters (All / Images / Videos / Identical file / Identical pixels /
+    Similar / Unreviewed / Reviewed / Marked for deletion),
+  - sorting (savings / duplicate count / size / **similarity** / name /
+    path), search, "≥ N files per group",
+  - Previous / Next navigation plus a side list of groups with their
+    category,
+  - side-by-side comparison with thumbnail, name, path, size, resolution,
+    format, color mode, EXIF orientation, camera, dates, SHA-256, pixel hash,
+    pHash and **similarity % vs. the group's reference file**,
+  - per file: **🔍 Zoom**, Open file, Open folder, Copy path, and **🗑
+    Delete** (deletes just that file, with confirmation and history),
+  - **zoomed-in viewer**: zoom (wheel / +/−) and pan, fit / actual size,
+    **◀ ▶ to page through the whole group** (or arrow keys) and decide
+    *Keep / Mark / Delete now* while looking at the detail view; respects
+    EXIF orientation **without touching the file**,
+  - a **non-binding recommendation** of what to keep, with a score
+    (`KEEP_SCORE`: resolution, size, lossless format, video bitrate,
+    EXIF/camera/date metadata, age, a "copy"-looking name, backup/temp
+    folder) and a **confidence percentage** — it never preselects anything,
+  - a live indicator of how much space would be freed, and a warning if a
+    decision would leave 0 copies.
+- **Safe deletion**:
+  - a "Keep this file" checkbox plus *Keep selected*, *Delete unselected*,
+    *Keep all*, *Ignore group* buttons — all of them only **mark**; nothing
+    is deleted until you click **"🗑 Delete marked files…"** and **confirm**,
+  - by default files are **moved to the system recycle bin** (`Send2Trash`,
+    recoverable); permanent deletion is a separate mode with a red warning,
+  - the confirmation dialog lists the files, the space to be freed, and any
+    warnings (a file that changed since analysis, a group that would end up
+    with no copies at all → a mandatory checkbox),
+  - each file is re-verified right before deletion; one that changed size or
+    disappeared **is skipped** and reported,
+  - a post-operation summary ("37 files moved to the recycle bin. Space
+    freed: 8.72 GB"),
+  - an **operation history** (Help → History): date, file, action, result —
+    including failures,
+  - deleted files stay visible, grayed out ("DELETED"); resolved groups move
+    to the "Resolved" filter.
+- **Export** (File → Export results): **CSV**, **JSON**, and a
+  **self-contained HTML report** with embedded thumbnails, paths, hashes,
+  similarity and each file's decision.
+- Results dashboard: scan totals, files decoded / perceptually hashed /
+  reused from cache, a breakdown by category, potential space recoverable,
+  and files deleted in the session.
+- **Dark and light theme** with **WCAG AA** contrast (dimmed text included),
+  visible hover/pressed/focus/disabled button states, and buttons that
+  disable themselves when their action doesn't apply.
+- **Language**: Spanish / English (Settings → General). Spanish is the
+  source language; the English translation covers the main interface and is
+  easy to extend.
+- Background analysis with **Pause / Resume / Cancel** (pausing also halts
+  the decoding stages); the interface never freezes.
+- Keyboard shortcuts: `←`/`→` previous/next group, `M` keep, `D` mark for
+  deletion, `A` keep all, `I` ignore, `Esc` go back.
+- A rotating on-disk log, viewable from **Settings → Logs**.
 
-### Categorías de coincidencia
+### Match categories
 
-Nunca se mezclan:
+Never mixed together:
 
-| Etiqueta | Confianza | Significado |
+| Label | Confidence | Meaning |
 |---|---|---|
-| 🟢 `ARCHIVO IDÉNTICO` | 100 % | Los bytes de los archivos son idénticos (mismo SHA-256). |
-| 🔵 `PIXEL POR PIXEL IDÉNTICO` | 100 % | Bytes distintos, pero los píxeles decodificados (orientación EXIF normalizada) son exactamente iguales. |
-| 🟦 `VISUALMENTE IDÉNTICO` | = score | Coincidencia perceptual casi perfecta, no confirmada a nivel de píxeles. |
-| 🟦 `REDIMENSIONADO` | = score | La misma imagen guardada a otra resolución / compresión / formato. |
-| 🟧 `RECORTE` | = score | Una imagen parece un encuadre parcial (recorte) de la otra. |
-| 🟦 `MISMO CONTENIDO PROBABLE` | = score | Vídeo: los fotogramas muestreados coinciden (nunca es una certeza). |
-| 🟡 `MUY SIMILAR` | = score | Probable variante (resolución/compresión/formato, ligeros ajustes). |
-| 🟠 `SIMILAR` | = score | Misma escena u objeto con diferencias mayores; revísala en detalle. |
-| 🔴 `DIFERENTE` | — | No es un duplicado (no se muestra como grupo). |
+| 🟢 `IDENTICAL FILE` | 100% | The files' bytes are identical (same SHA-256). |
+| 🔵 `PIXEL-BY-PIXEL IDENTICAL` | 100% | Different bytes, but the decoded pixels (EXIF orientation normalized) are exactly equal. |
+| 🟦 `VISUALLY IDENTICAL` | = score | A near-perfect perceptual match, not confirmed at the pixel level. |
+| 🟦 `RESIZED` | = score | The same image saved at another resolution / compression / format. |
+| 🟧 `CROPPED` | = score | One image looks like a partial frame (crop) of the other. |
+| 🟦 `LIKELY SAME CONTENT` | = score | Video: the sampled frames match (never a certainty). |
+| 🟡 `VERY SIMILAR` | = score | A likely variant (resolution/compression/format, minor edits). |
+| 🟠 `SIMILAR` | = score | Same scene or subject with bigger differences; review it in detail. |
+| 🔴 `DIFFERENT` | — | Not a duplicate (not shown as a group). |
 
-El *score* es la similitud calculada por los algoritmos, **no una verdad
-matemática**: preferimos decir "posiblemente similar" a afirmar un duplicado
-que no lo es.
+The *score* is a similarity calculated by the algorithms, **not mathematical
+truth**: PixMatch would rather say "possibly similar" than assert a duplicate
+that isn't one.
 
-### Pestaña "Renombrar por fecha"
+### "Rename by date" tab
 
-Una segunda pestaña, independiente del análisis de duplicados, para **ordenar
-la nomenclatura** de una biblioteca de fotos/vídeos:
+A second tab, independent of duplicate analysis, to **clean up the naming**
+of a photo/video library:
 
-- Escanea una carpeta **y sus subcarpetas**.
-- Propone para cada archivo un nombre `AAAAMMDD_HHMMSS.ext`, con la fecha
-  tomada de (en orden): **EXIF DateTimeOriginal → DateTimeDigitized →
-  DateTime → metadatos de vídeo (ffprobe) → fecha de modificación del
-  archivo** (siempre disponible, es el respaldo).
-- **Vista previa en tabla** (carpeta · nombre actual · nombre nuevo · fecha ·
-  origen de la fecha) con casilla por fila para incluir/excluir.
-- Formato configurable (patrón `strftime`), prefijo opcional (p. ej. `IMG_`),
-  incluir vídeos, extensión en minúsculas, `.jpeg`→`.jpg`.
-- Los archivos **no se mueven de carpeta**: solo cambia el nombre.
-- **Nunca sobrescribe** un archivo existente — si dos fotos comparten segundo
-  (o el nombre ya está ocupado), se añade `_2`, `_3`… de forma determinista y
-  por carpeta.
-- Renombrado en **dos fases** (nombre temporal → final) para que intercambios
-  y ciclos sean seguros; si algo falla, se revierte.
-- Todo queda en el **historial** y hay **"Deshacer último renombrado"**.
+- Scans a folder **and its subfolders**.
+- Proposes a `YYYYMMDD_HHMMSS.ext` name for each file, with the date taken
+  from (in order): **EXIF DateTimeOriginal → DateTimeDigitized → DateTime →
+  video metadata (ffprobe) → the file's modification date** (always
+  available, the fallback).
+- **Table preview** (folder · current name · new name · date · date source)
+  with a per-row checkbox to include/exclude.
+- Configurable format (`strftime` pattern), an optional prefix (e.g. `IMG_`),
+  include videos, lowercase extensions, `.jpeg`→`.jpg`.
+- Files **never change folder**: only the name changes.
+- **Never overwrites** an existing file — if two photos share a second (or
+  the name is already taken), a deterministic `_2`, `_3`… suffix is added,
+  per folder.
+- Renaming is done in **two phases** (a temporary name, then the final one)
+  so swaps and cycles are safe; anything that fails is rolled back.
+- Everything goes to the **history**, with an **"Undo last rename"** action.
+
+### "Import & organize" tab
+
+A third tab to **empty a source** (a phone, an SD card, a downloads folder)
+into an already-ordered library:
+
+- You choose a **source folder** and the **library's root folder**.
+- For each photo / video:
+  - **capture date**, with the same priority as renaming (EXIF → video
+    metadata → modification date),
+  - **country** from the file's own **GPS** (EXIF `GPSLatitude/…` for
+    photos; the `location` ISO 6709 tag via ffprobe for videos), resolved
+    **offline** with a borders dataset bundled with the app
+    (`app/resources/country_borders.json`, Natural Earth 1:50m, public
+    domain). No GPS → the **"No location"** folder (the label is
+    configurable).
+  - **destination** `<library>/<Country>/<Year>/<Year-Month>/<YYYYMMDD_HHMMSS.ext>`.
+    An existing country folder with different letter case is reused; there's
+    a country **alias** map in the settings.
+- **"Already there" detection** against the whole library:
+  - **identical SHA-256** (with a size prefilter), and
+  - **identical pixels** (same content in another format/with different
+    metadata) — for this, the library's image dimensions are indexed; if you
+    already analyzed it from the *Duplicates* tab, that cache is reused.
+  - duplicates **within the batch itself** are also caught.
+- **Table preview** (source · date · country · destination folder · name ·
+  status) with a per-row checkbox. Files already in the library **are not
+  moved**; you can tick their row to **send the source to the recycle bin**.
+- **Move = copy → verify SHA-256 at the destination → remove the source.**
+  If the copy fails or doesn't match, the original **is left untouched**. A
+  library file is never overwritten: if two photos share a name, **neither**
+  is left without a suffix — both get `_01`, `_02`… with a leading zero.
+- Everything goes to the **history**, with an **"Undo last import"** action.
+
+### "Organize library" tab
+
+A fourth tab to put an **already-existing but disorganized** library in
+order (an old hard drive, years of unsorted dumping): it rearranges that
+same folder, in place, with the
+`<Country>/<Year>/<Year-Month>/<YYYYMMDD_HHMMSS.ext>` structure — the same
+date, GPS and naming logic as "Import & organize", but **without comparing
+anything against anything**:
+
+- There is no "already there" or duplicate detection — that isn't its job.
+  Every file is placed where its own metadata says it belongs.
+- A file that is **already** exactly where it belongs (same folder, same
+  name) is left alone — running it twice in a row does nothing the second
+  time.
+- Two files that would land on the same name are kept apart with the same
+  `_01`/`_02`… suffix import uses — never overwritten.
+- The move is an **atomic rename** when source and destination are on the
+  same drive (the normal case when reorganizing a single drive): no copying
+  needed. If it crosses to another filesystem (e.g. a volume mounted inside
+  the folder), it falls back to copy → verify SHA-256 → remove the source,
+  same as importing.
+- Everything goes to the **history**, with an **"Undo last reorganization"**
+  action.
+
+To regenerate the borders dataset:
+`python scripts/build_country_borders.py` (downloads Natural Earth once).
 
 ---
 
-## Descargar (usuarios)
+## Download (users)
 
-Ejecutables listos para usar en la
-[**página de releases**](https://github.com/randallquesadaa/PixMatch/releases/latest)
-— no hace falta instalar Python:
+Ready-to-run executables on the
+[**releases page**](https://github.com/randallquesadaa/PixMatch/releases/latest)
+— no Python install needed:
 
-| Sistema | Archivo | Cómo se abre |
+| OS | File | How to open it |
 |---|---|---|
-| Windows 10/11 (x64) | `PixMatch-*-windows-x64.zip` | descomprimir → `PixMatch.exe` |
-| macOS (Apple Silicon) | `PixMatch-*-macos-arm64.zip` | 1ª vez: clic derecho → *Abrir* |
-| Linux (x86-64) | `PixMatch-*-linux-x86_64.tar.gz` | extraer → `./PixMatch/PixMatch` |
+| Windows 10/11 (x64) | `PixMatch-*-windows-x64.zip` | unzip → `PixMatch.exe` |
+| macOS (Apple Silicon) | `PixMatch-*-macos-arm64.zip` | first run: right-click → *Open* |
+| Linux (x86-64) | `PixMatch-*-linux-x86_64.tar.gz` | extract → `./PixMatch/PixMatch` |
 
-Los binarios no están firmados; verifica la descarga con el `SHA256SUMS.txt` de
-cada release. Para analizar **vídeos** hace falta FFmpeg instalado en el sistema
-(PixMatch lo detecta automáticamente); para **imágenes** no hace falta nada más.
+Binaries are unsigned; verify the download against each release's
+`SHA256SUMS.txt`. Analyzing **video** needs FFmpeg installed on the system
+(PixMatch detects it automatically); **images** need nothing else.
 
-Cada release se genera automáticamente desde GitHub Actions cuando sube a `main`
-un cambio de versión que ha pasado toda la CI (tests en Linux/macOS/Windows,
-lint, análisis de seguridad).
+Every release is built automatically by GitHub Actions when a version bump
+lands on `main` and passes the full CI (tests on Linux/macOS/Windows, lint,
+security analysis).
 
 ---
 
-## Instalación (desde el código)
+## Install from source
 
-Requiere **Python 3.11+** (probado con 3.14).
+Requires **Python 3.11+** (tested with 3.14).
 
 ```bash
 python -m venv .venv
@@ -227,428 +298,278 @@ python -m venv .venv
 # macOS / Linux
 source .venv/bin/activate
 
-pip install -r requirements.txt
+pip install -e .
 ```
 
-### Formatos de imagen
+### Image formats
 
-De serie (vía Pillow): JPG/JPEG, PNG, WEBP, GIF, BMP, TIFF/TIF.
+Built in (via Pillow): JPG/JPEG, PNG, WEBP, GIF, BMP, TIFF/TIF.
 
-Opcionales (se activan solos si están instalados):
+Optional (activate themselves once installed):
 
 ```bash
 pip install pillow-heif        # HEIC / HEIF
 pip install pillow-avif-plugin # AVIF
 ```
 
-Si un formato no tiene decodificador, el archivo se sigue escaneando y
-hasheando (la detección de duplicados **exactos** por SHA-256 no necesita
-decodificar); solo se pierde la miniatura, los metadatos y la comparación de
-píxeles / perceptual de ese archivo.
+If a format has no decoder, the file is still scanned and hashed (**exact**
+SHA-256 duplicate detection doesn't need to decode it); only its thumbnail,
+metadata and pixel/perceptual comparison are skipped.
 
-### FFmpeg (para el análisis de vídeo)
+### FFmpeg (for video analysis)
 
-Formatos: MP4, M4V, MOV, AVI, MKV, WMV, WEBM, MPEG/MPG, 3GP, TS/M2TS, FLV…
+Formats: MP4, M4V, MOV, AVI, MKV, WMV, WEBM, MPEG/MPG, 3GP, TS/M2TS, FLV…
 
-1. **Recomendado**: instala FFmpeg del sistema y déjalo en el PATH.
-   - Windows: `winget install Gyan.FFmpeg` (o [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
+1. **Recommended**: install the system FFmpeg and leave it on the PATH.
+   - Windows: `winget install Gyan.FFmpeg` (or [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
    - macOS: `brew install ffmpeg`
    - Linux: `sudo apt install ffmpeg` / `sudo dnf install ffmpeg`
-2. O define la ruta manualmente en **Configuración → Escaneo → Ruta de FFmpeg**
-   (acepta el ejecutable o su carpeta).
-3. O, como atajo sin configurar nada: `pip install imageio-ffmpeg` (binario
-   embebido, ~30 MB) — la app lo detecta automáticamente.
+2. Or set the path manually in **Settings → Scanning → FFmpeg path** (accepts
+   the executable or its folder).
+3. Or, as a zero-config shortcut: `pip install imageio-ffmpeg` (bundled
+   binary, ~30 MB) — the app detects it automatically.
 
-Sin FFmpeg, el análisis de vídeo se omite (la app lo avisa) pero los vídeos
-**byte-idénticos** se siguen detectando por SHA-256.
+Without FFmpeg, video analysis is skipped (the app says so), but
+**byte-identical** videos are still detected via SHA-256.
 
-### Configuración (Configuración → pestaña Escaneo)
+### Settings (Settings → Scanning tab)
 
-- Analizar imágenes / **detectar pixel-por-pixel idénticas** (ambas activas por
-  defecto).
-- **Analizar imágenes similares** (motor combinado) — desactivado por defecto
-  porque decodifica todas las imágenes.
-  - **Sensibilidad de detección**: *Baja* (solo duplicados muy claros),
-    *Media* (+ imágenes muy similares), *Alta* (+ variantes, recortes y
-    modificaciones), *Personalizada*.
-  - En *Personalizada*: editar las tres **bandas de score**, los **pesos** de
-    las 5 señales, y activar la **detección de recortes**.
-  - **Detección avanzada mediante IA** (embeddings CLIP) — opcional.
-- **Analizar vídeos** (desactivado por defecto) + **Ruta de FFmpeg** +
-  **Comprobar FFmpeg**.
-- **Usar caché en disco** y su ruta.
-- Seguir enlaces simbólicos, tamaño mínimo, extensiones y carpetas a excluir,
-  nº de *workers*, tema.
-- **Modo de eliminación por defecto** (pestaña General): papelera del sistema
-  (recomendado) o permanente. La confirmación es **siempre** obligatoria.
+- Analyze images / **detect pixel-by-pixel identical** (both on by default).
+- **Analyze similar images** (combined engine) — off by default because it
+  decodes every image.
+  - **Detection sensitivity**: *Low* (only very clear duplicates), *Medium*
+    (+ very similar images), *High* (+ variants, crops and edits), *Custom*.
+  - In *Custom*: edit the three **score bands**, the **weights** of the 5
+    signals, and toggle **crop detection**.
+  - **AI-assisted detection** (CLIP embeddings) — optional.
+- **Analyze videos** (off by default) + **FFmpeg path** + **Check FFmpeg**.
+- **Use on-disk cache** and its path.
+- Follow symlinks, minimum size, excluded extensions and folders, number of
+  *workers*, theme.
+- **Default deletion mode** (General tab): system recycle bin (recommended)
+  or permanent. Confirmation is **always** required.
 
 ---
 
-## Ejecución
+## Running it
 
 ```bash
 python main.py
-# o, con una carpeta inicial:
-python main.py "/ruta/a/mis fotos"
+# or, with a starting folder:
+python main.py "/path/to/my photos"
 ```
 
 ---
 
-## Tests y calidad de código
+## Tests and code quality
 
 ```bash
 pip install -e ".[dev]"
 
-pytest                     # 169 tests (interfaz incluida, sin pantalla)
+pytest                     # 200 tests (UI included, headless)
 ruff check .               # lint
-ruff format --check .      # formato
-bandit -c pyproject.toml -r app --severity-level medium   # análisis de seguridad
-pip-audit -r requirements.txt                             # CVEs en dependencias
+ruff format --check .      # formatting
+bandit -c pyproject.toml -r app --severity-level medium   # security analysis
+pip-audit                                                 # dependency CVEs
 ```
 
-Los tests de interfaz usan `QT_QPA_PLATFORM=offscreen` (configurado en CI). Los
-de vídeo se **saltan automáticamente** si no hay FFmpeg; los de IA, si no hay
-backend de embeddings.
+UI tests use `QT_QPA_PLATFORM=offscreen` (set in CI). Video tests are
+**skipped automatically** without FFmpeg; AI tests, without an embeddings
+backend.
 
-**Integración continua** (`.github/workflows/`): en cada Pull Request y en cada
-push a `main` se ejecutan, y **todo tiene que pasar**:
+**Continuous integration** (`.github/workflows/`): runs on every pull
+request and every push to `main`, and **everything has to pass**:
 
-| Comprobación | Herramienta |
+| Check | Tool |
 |---|---|
-| Funcionalidad y fiabilidad | `pytest` en **Linux · macOS · Windows** × Python **3.11 / 3.12 / 3.13** (con FFmpeg, así los tests de vídeo corren de verdad) |
-| Estandarización de código | `ruff check` + `ruff format --check` |
-| Vulnerabilidades en el código | `bandit` (falla en severidad media+) y **CodeQL** (`security-and-quality`, semanal) |
-| Vulnerabilidades en dependencias | `pip-audit` + **dependency-review** (bloquea PRs con CVEs altas o licencias GPL) |
-| Dependencias al día | **Dependabot** semanal (pip + GitHub Actions) |
+| Functionality and reliability | `pytest` on **Linux · macOS · Windows** × Python **3.11 / 3.12 / 3.13** (with FFmpeg, so video tests actually run) |
+| Code style | `ruff check` + `ruff format --check` |
+| Code vulnerabilities | `bandit` (fails at medium+ severity) and **CodeQL** (`security-and-quality`, weekly) |
+| Dependency vulnerabilities | `pip-audit` + **dependency-review** (blocks PRs with high-severity CVEs or GPL/AGPL licenses) |
+| Dependencies up to date | Weekly **Dependabot** (pip + GitHub Actions) |
 
-- **Fase 1** — SHA-256 vs `hashlib`, idénticos / distintos / vacíos, rutas
-  Unicode, cancelación, `partial_signature`; escaneo recursivo, exclusiones,
-  tamaño mínimo, ciclos de symlink, permisos; agrupación (grupos de N, orden,
-  banderas de seguridad); pipeline (copias byte-idénticas agrupan; colisión de
-  tamaño sin coincidencia real NO; pausa/reanudación; cancelación → parcial;
-  archivo ilegible no aborta; orientación EXIF); `RunController`; humo de GUI.
-- **Fase 2** — `test_perceptual.py` (hashes 64-bit, idénticas iguales,
-  redimensionada cercana, distintas lejanas, corrupta→None, BK-tree,
-  `classify_similarity` no mezcla categorías); `test_image_analyzer.py`
-  (PNG/BMP = mismo digest, RGB vs RGBA opaco, orientación EXIF normalizada,
-  corrupta→None, `difference_image`); `test_database.py` (upsert/get, validez,
-  persistencia, purga, DB corrupta degrada sin excepción);
-  `test_analysis_phase2.py` (PNG+BMP → `PIXEL_IDENTICAL`; byte-idénticas siguen
-  `FILE_IDENTICAL`; copia redimensionada = similar solo con perceptual activo;
-  incremental reutiliza caché; caché se invalida al cambiar el archivo;
-  **la pausa bloquea la fase de decodificación**).
-- **Fase 3** — `test_deletion.py` (permanente borra; papelera **mueve** a una
-  papelera falsa; archivo inexistente/cambiado se omite; carpeta nunca se
-  borra; preview marca grupos vacíos + avisos; cancelación corta el lote;
-  rutas Unicode; error de permisos registrado; el historial registra los
-  fallos); `test_history.py` (persistencia, clear, degradación);
-  `test_export.py` (CSV, JSON round-trip, HTML autocontenido y escapado);
-  resolución de grupos tras borrado; flujo de borrado en la UI.
-- **Fase 4** — `test_ffmpeg.py` (detección no lanza, fallback ante ruta
-  inválida, ruta de fichero / carpeta); `test_videos.py` (metadatos;
-  hashes de fotogramas + comparación: recomprimido ≥90 %, distinto <80 %,
-  sin solape → `None`; serialización; byte-idénticos → `FILE_IDENTICAL`;
-  recomprimido → "mismo contenido probable"; no relacionados no agrupan;
-  **byte-idéntico + recomprimido en un grupo de 3**; sin FFmpeg no rompe;
-  incremental reutiliza la caché de vídeo).
-- **Tema / accesibilidad** — `test_theme.py`: cambiar de tema **invierte** los
-  colores de texto (también en widgets anidados ya creados); el texto de
-  cuerpo, atenuado y deshabilitado **cumple contraste WCAG** en ambos temas
-  (se calcula el ratio y falla si baja del umbral).
-- **Recomendación** — `test_recommendation.py`: prefiere mayor resolución /
-  bitrate / archivo más antiguo; penaliza nombres "copia" y carpetas de
-  backup; confianza baja en grupos byte-idénticos sin señal.
-- **i18n** — `test_i18n.py`: español es identidad; inglés traduce lo conocido
-  y deja pasar lo desconocido (nunca vacío).
-- **Fase 6 (similitud inteligente)** — `test_color_hist.py` (firma, brillo
-  tolerado, paleta distinta = baja); `test_similarity_engine.py` (score
-  combinado, pesos normalizados y respetados, ascenso a `RESIZED`, bandas,
-  presets); `test_crop_detect.py` (recorte real detectado con región, no
-  relacionados = None, recorte casi de marco completo ≠ recorte);
-  `test_similarity_phase6.py` (**req. 57**: dos atardeceres distintos NO se
-  agrupan; resize→`RESIZED`; crop→`RECORTE` solo en Alta; brillo/blur siguen
-  detectándose; sensibilidad baja más estricta; toda coincidencia lleva
-  etiqueta + confianza; IA opcional inofensiva sin backend).
-- **Renombrar por fecha** — `test_renamer.py`: EXIF vs fecha de modificación;
-  formato y prefijo; sufijos deterministas al chocar (mismo segundo o archivo
-  ya existente); subcarpetas numeradas por separado; **intercambio A↔B seguro**
-  (renombrado en dos fases); **nunca sobrescribe** (rollback); **deshacer**;
-  rutas Unicode; filas desactivadas se saltan.
+Coverage highlights, by area:
+
+- **Exact duplicates** — SHA-256 vs `hashlib`, identical / different / empty,
+  Unicode paths, cancellation, `partial_signature`; recursive scanning,
+  exclusions, minimum size, symlink cycles, permissions; grouping (N-way
+  groups, ordering, safety flags); pipeline (byte-identical copies group; a
+  size collision with no real match does NOT); pause/resume; cancellation →
+  partial result; an unreadable file doesn't abort the run; EXIF
+  orientation; `RunController`; a GUI smoke test.
+- **Pixel-identical & perceptual** — `test_perceptual.py` (64-bit hashes,
+  identical match, a near resize, distant images don't, corrupt → None,
+  BK-tree, `classify_similarity` never mixes categories);
+  `test_image_analyzer.py` (PNG/BMP = same digest, opaque RGB vs RGBA, EXIF
+  orientation normalized, corrupt → None, `difference_image`);
+  `test_database.py` (upsert/get, validity, persistence, pruning, a
+  corrupted DB degrades without raising); `test_analysis_phase2.py`
+  (PNG+BMP → `PIXEL_IDENTICAL`; byte-identical copies stay
+  `FILE_IDENTICAL`; a resized copy is similar only with perceptual matching
+  on; incremental runs reuse the cache; the cache invalidates when a file
+  changes; **pausing blocks the decoding stage**).
+- **Safe deletion** — `test_deletion.py` (permanent deletes; recycle bin
+  **moves** to a fake trash; a missing/changed file is skipped; a folder is
+  never deleted; the preview flags empty groups + warnings; cancellation
+  cuts the batch short; Unicode paths; a permission error is logged; the
+  history records failures); `test_history.py` (persistence, clearing,
+  graceful degradation); `test_export.py` (CSV, JSON round-trip, a
+  self-contained and properly escaped HTML report); group resolution after
+  deletion; the UI deletion flow.
+- **Video** — `test_ffmpeg.py` (detection never raises, falls back on an
+  invalid path, a file or folder path); `test_videos.py` (metadata; frame
+  hashes + comparison: a re-encode scores ≥90%, an unrelated video <80%, no
+  overlap → `None`; serialization; byte-identical → `FILE_IDENTICAL`; a
+  re-encode → "likely same content"; unrelated videos don't group;
+  **byte-identical + re-encode land in one group of 3**; missing FFmpeg
+  doesn't crash anything; incremental runs reuse the video cache).
+- **Theme / accessibility** — `test_theme.py`: switching theme **inverts**
+  text colors (nested widgets already on screen included); body, dimmed and
+  disabled text **meet WCAG contrast** in both themes (the ratio is computed
+  and the test fails below the threshold).
+- **Recommendation** — `test_recommendation.py`: prefers higher resolution /
+  bitrate / an older file; penalizes "copy"-looking names and backup
+  folders; low confidence for byte-identical groups with no other signal.
+- **i18n** — `test_i18n.py`: Spanish is the identity; English translates
+  known strings and passes unknown ones through (never blank).
+- **Smart similarity** — `test_color_hist.py` (signature, brightness
+  tolerated, a different palette scores low); `test_similarity_engine.py`
+  (combined score, weights normalized and respected, promotion to
+  `RESIZED`, bands, presets); `test_crop_detect.py` (a real crop is detected
+  with its region, unrelated images = None, an almost-full-frame crop ≠ a
+  crop); `test_similarity_phase6.py` (two different sunsets do NOT group;
+  resize → `RESIZED`; crop → `CROPPED` only at High sensitivity;
+  brightness/blur are still detected; low sensitivity is stricter; every
+  match carries a label + confidence; the optional AI vote is harmless
+  without a backend).
+- **Rename by date** — `test_renamer.py`: EXIF vs. modification date; format
+  and prefix; deterministic suffixes on a clash (same second or an existing
+  file); subfolders numbered independently; **A↔B swap is safe** (two-phase
+  rename); **never overwrites** (rollback); **undo**; Unicode paths;
+  disabled rows are skipped.
+- **Import & organize** — `test_geo.py`: EXIF GPS (DMS→decimal, missing,
+  *null island*), ISO 6709, `CountryResolver` (known points incl. coastal
+  ones via *snapping*, ocean = None, a missing dataset degrades gracefully).
+  `test_importer.py`: `<Country>/<Year>/<Year-Month>/<name>` destination, no
+  GPS → "No location", reuses an existing country folder ignoring accents,
+  aliases; exact / pixel / in-batch duplicates; `_01`/`_02` suffix on a name
+  clash (never one left bare next to numbered ones, or next to a file
+  already on disk); a verified move + **undo**; the source is only removed
+  once the copy succeeds; a duplicate's source is only trashed if ticked.
+- **Organize library** — `test_organizer.py`: same destination as importing,
+  but **without** evaluating duplicates; a file already in place →
+  `UNCHANGED` and untouched; `_01`/`_02` suffix on a name clash; apply +
+  **undo**; falls back to copy-verify-remove if the atomic rename fails by
+  crossing a filesystem boundary (`EXDEV`).
 
 ---
 
-## Instalar como paquete (opcional)
+## Install as a package (optional)
 
 ```bash
-pip install .            # instala el comando `pixmatch`
+pip install .            # installs the `pixmatch` command
 pip install ".[video]"   # + imageio-ffmpeg
 pixmatch
 ```
 
 ---
 
-## Generar un ejecutable
+## Building an executable
 
-**Lo normal es no tener que hacerlo**: los ejecutables de cada release los
-construye GitHub Actions (`.github/workflows/release.yml`) para las tres
-plataformas y quedan en la [página de releases](https://github.com/randallquesadaa/PixMatch/releases).
+**You normally won't need to**: release executables are built by GitHub
+Actions (`.github/workflows/release.yml`) for all three platforms and
+published on the [releases page](https://github.com/randallquesadaa/PixMatch/releases).
 
-El flujo de release automático:
+The automated release flow:
 
-1. En un PR, subes la versión en `app/__init__.py` (`__version__`).
-2. Al fusionar a `main`, se ejecuta toda la CI.
-3. Si pasa y esa versión aún no tiene tag, Actions crea el tag `vX.Y.Z`,
-   compila en Linux/macOS/Windows con **PyInstaller** (one-folder) y publica un
-   Release con los tres archivos + `SHA256SUMS.txt`.
+1. In a PR, bump the version in `app/__init__.py` (`__version__`).
+2. Merging to `main` runs the full CI.
+3. If it passes and that version has no tag yet, Actions creates the
+   `vX.Y.Z` tag, builds Linux/macOS/Windows with **PyInstaller**
+   (one-folder), and publishes a Release with all three archives plus
+   `SHA256SUMS.txt`.
 
-Los binarios publicados **no** empaquetan `imageio-ffmpeg`: su FFmpeg es GPL y
-contaminaría la licencia del ejecutable. PixMatch se mantiene MIT y detecta un
-FFmpeg del sistema en tiempo de ejecución.
+Published binaries **do not** bundle `imageio-ffmpeg`: its FFmpeg is GPL and
+would taint the executable's license. PixMatch stays MIT and detects a
+system FFmpeg at runtime.
 
-### Compilar a mano
+### Building manually
 
-Desde la raíz del proyecto, en la plataforma de destino (no hay
-cross-compilación):
+From the project root, on the target platform (no cross-compilation):
 
 ```bash
 packaging/build_linux.sh          # -> dist/PixMatch/PixMatch
-packaging/build_macos.sh          # -> dist/PixMatch.app  (genera .icns)
+packaging/build_macos.sh          # -> dist/PixMatch.app  (generates .icns)
 packaging\build_windows.bat       # -> dist\PixMatch\PixMatch.exe
 ```
 
-O directamente: `pyinstaller packaging/PixMatch.spec --noconfirm`. Los scripts
-`build_*` sí instalan `imageio-ffmpeg`, así que un ejecutable hecho a mano lleva
-FFmpeg embebido (y por tanto **no** se puede redistribuir salvo bajo GPL).
+Or directly: `pyinstaller packaging/PixMatch.spec --noconfirm`. The
+`build_*` scripts do install `imageio-ffmpeg`, so a manually built
+executable ships with FFmpeg embedded (and therefore **can't** be
+redistributed except under the GPL).
 
-- macOS: app sin firmar; primera ejecución con clic derecho → Abrir, o
+- macOS: the app is unsigned; first run with right-click → Open, or
   `xattr -dr com.apple.quarantine dist/PixMatch.app`.
-- El ejecutable pesa ~250 MB (PySide6), ~270 MB con FFmpeg embebido.
+- The executable is about ~250 MB (PySide6), ~270 MB with FFmpeg bundled.
 
 ---
 
-## Rendimiento
+## Performance
 
-Benchmark reproducible: `N=3000 python scripts/benchmark.py`.
+Reproducible benchmark: `N=3000 python scripts/benchmark.py`.
 
-Medido en el equipo de desarrollo (imágenes sintéticas 800×600, ~todos los
-núcleos):
+Measured on the development machine (synthetic 800×600 images, ~all cores):
 
-| Escenario | 3 000 imágenes | pico RSS |
+| Scenario | 3,000 images | peak RSS |
 |---|---|---|
-| Detección exacta (SHA-256 + pixel) | ~4 s (~1,3 ms/img) | ~210 MB |
-| + hash perceptual | ~8,5 s (~2,8 ms/img) | ~212 MB |
-| Reanálisis **incremental** | ~0,1 s | — |
+| Exact detection (SHA-256 + pixel) | ~4 s (~1.3 ms/img) | ~210 MB |
+| + perceptual hashing | ~8.5 s (~2.8 ms/img) | ~212 MB |
+| **Incremental** re-analysis | ~0.1 s | — |
 
-* El **pico de RSS se mantiene plano** al crecer N: hashes en *streaming*,
-  imágenes decodificadas de una en una y liberadas, caché de miniaturas LRU
-  (máx. 400). Sin fuga de memoria en la UI navegando cientos de grupos.
-* Extrapolación lineal: **100 000 imágenes ≈ 2 min** (exacto) / **≈ 5 min**
-  (+perceptual); luego el incremental es de segundos.
-* Fotos reales (12 MP) decodifican más lento por imagen; la arquitectura
-  (paralela + streaming + caché) es la misma.
-
----
-
-## Arquitectura y decisiones técnicas
-
-```
-app/
-  main.py                 punto de entrada (CLI --version/--help, logging, QApplication)
-  config.py               AppConfig, persistida en JSON en la carpeta de config del SO
-  i18n.py                 tr() + tabla ES->EN (español = idioma fuente)
-  core/                   lógica pura, sin Qt (fácil de testear)
-    scanner.py            escaneo recursivo iterativo; FileKind, ScanStats, ScanOptions
-    hashing.py            hash_file (SHA-256 en streaming, cancelable), partial_signature
-    metadata.py           lectura de metadatos de imagen y orientación EXIF (solo lectura)
-    similarity.py         MatchCategory (7), classify_*, category_confidence
-    perceptual.py         pHash / dHash / aHash / bHash, Hamming, BK-tree
-    color_hist.py         firma de color HS (64 bins) + intersección
-    image_features.py     compute_signatures(): todas las firmas en 1 decode
-    similarity_engine.py  combined_score() ponderado + motivos + sensibilidad
-    crop_detect.py        detect_crop(): NCC sobre rejilla, score + región
-    embeddings.py         backend CLIP opcional (open_clip), encode/decode
-    image_analyzer.py     pixel_digest, pixels_equal, difference_image
-    ffmpeg.py             detect() (config / PATH / imageio-ffmpeg), install_hint
-    video_analyzer.py     probe_video, extract_frame_hashes, compare_frame_hashes
-    duplicate_groups.py   FileRecord, Decision, DuplicateGroup, AnalysisResult,
-                          build_groups (capas pixel -> sha -> perceptual -> vídeo)
-    analysis.py           run_analysis(): scan -> SHA-256 -> píxeles -> perceptual -> vídeo -> grupos
-    recommendation.py     recommend_keep(): KEEP_SCORE ponderado, NO vinculante
-    deletion_manager.py   build_preview + DeletionManager (papelera / permanente)
-    renamer.py            renombrado por fecha (EXIF/mtime, sin sobrescribir, undo)
-    export.py             export_csv / export_json / export_html
-  database/               models.py + database.py (FileCacheDB) + history.py (OperationHistory)
-  workers/
-    analysis_worker.py    AnalysisWorker + AnalysisController (ciclo de vida del QThread)
-    deletion_worker.py    DeletionRunner (hilo de fondo, señales en cola)
-    rename_worker.py      RenamePreviewRunner + RenameApplyRunner
-  ui/                     PySide6
-    main_window.py (QTabWidget), duplicate_view.py, rename_view.py,
-    image_viewer.py, advanced_compare.py, video_viewer.py,
-    deletion_dialog.py, settings_dialog.py, theme.py
-    widgets/file_card.py, widgets/thumbnail_loader.py
-  utils/
-    paths.py, logging_setup.py, control.py, file_utils.py, thumbnail_cache.py
-packaging/    PixMatch.spec + build_{linux,macos,windows}.* + resources/icon.*
-scripts/      benchmark.py
-tests/
-```
-
-**Por qué estas decisiones:**
-
-- **PySide6 (Qt)** — pedido en el enunciado; da temas, `QThread`, widgets
-  maduros y multiplataforma real. Licencia LGPL.
-- **Núcleo sin Qt** — `app/core/*` no importa PySide6. El pipeline
-  (`run_analysis`) usa *callbacks*, y el `AnalysisWorker` los traduce a
-  señales Qt. Así el 80% de la lógica se prueba sin arrancar una GUI.
-- **Tema por `QPalette` + contraste AA** — los colores base van en una paleta
-  clara/oscura (no en `QWidget { color }`, que no se limpia al cambiar de
-  hoja). El texto atenuado usa un rol propio (`PlaceholderText`), separado del
-  color de borde, para poder tener bordes sutiles sin sacrificar legibilidad;
-  un test calcula el ratio WCAG y falla si baja de 4.5:1.
-- **i18n ligero** — `tr()` con tabla ES→EN en memoria; el español es el
-  idioma fuente (las claves son las cadenas en español), así una cadena sin
-  traducir nunca sale vacía. Los combos guardan la clave canónica como
-  `itemData` para que la lógica no dependa del idioma. Sin `gettext`/`.po`
-  para no añadir toolchain de compilación de traducciones.
-- **KEEP_SCORE ponderado** — la recomendación combina resolución, tamaño,
-  formato, bitrate, metadatos, antigüedad, nombre y carpeta; se muestra con
-  un % de confianza derivado del margen y **se limita** en grupos byte-
-  idénticos sin señal (ahí "cuál conservar" es una preferencia, no calidad).
-  Nunca preselecciona nada para borrar.
-- **Escaneo iterativo con pila explícita** — árboles muy profundos no
-  provocan `RecursionError`. Se registran `(st_dev, st_ino)` visitados para
-  que ni siquiera seguir symlinks a propósito pueda crear un bucle infinito.
-- **Tamaño → SHA-256, nunca solo tamaño** — el tamaño solo descarta trabajo;
-  la evidencia de duplicado exacto es siempre el hash criptográfico completo.
-  `partial_signature` (cabecera+cola+tamaño) es una optimización adicional y
-  jamás se usa por sí sola para declarar un duplicado.
-- **`FILE_IDENTICAL` ≠ `PIXEL_IDENTICAL` ≠ "similar"** — el código distingue
-  "mismos bytes" (SHA-256), "misma imagen decodificada" (hash de píxeles) y
-  "se parece" (hash perceptual). Un grupo solo es `ARCHIVO IDÉNTICO` si además
-  de los píxeles coinciden los SHA-256. Una coincidencia perceptual perfecta
-  que no se confirma a nivel de píxeles es `VISUALMENTE IDÉNTICO`, nunca
-  `PIXEL IDÉNTICO`. Hay tests que fijan cada frontera.
-- **Hash perceptual propio, sin numpy ni `imagehash`** — pHash necesita un DCT
-  8×8; hacerlo a mano cuesta ~10k multiplicaciones por imagen (nada frente a
-  decodificar) y evita arrastrar numpy/scipy al empaquetado. Un solo decode
-  por imagen produce los tres hashes. Cambiar a numpy más adelante es un
-  cambio local a `perceptual.py`.
-- **Comparación de píxeles sin O(n²)** — en vez de comparar cada par, se
-  calcula un SHA-256 de los píxeles normalizados (orientación EXIF aplicada en
-  memoria, todo a RGBA) y se agrupa por igualdad de ese digest. Cada imagen se
-  abre una vez y se libera enseguida; solo se decodifican los candidatos cuyas
-  dimensiones coinciden con las de otra imagen.
-- **Caché SQLite en un solo hilo** — `run_analysis` abre la base de datos en el
-  hilo del worker, lee todo al principio y escribe todo al final; los hilos del
-  pool nunca tocan SQLite. Si el fichero está corrupto, `FileCacheDB` degrada a
-  no-op y el análisis continúa sin caché. La validez de una fila se decide por
-  (tamaño, mtime); los valores `None` nunca se dan por buenos.
-- **Similitud = motor combinado, no un solo algoritmo** — el score es una
-  media **ponderada y configurable** de 5 señales (pHash, dHash, aHash,
-  histograma de color, hash de composición 16×16). El histograma de color y el
-  hash de composición son los que evitan el falso positivo clásico ("dos
-  atardeceres distintos"); un test lo fija. La BK-tree solo hace el
-  *prefiltrado* barato de pares candidatos; la decisión la toma el motor.
-- **`RESIZED` y `RECORTE` como categorías propias** — no todo lo "similar" es
-  lo mismo: una reducción de resolución (`RESIZED_DUPLICATE`) y un encuadre
-  parcial (`CROPPED_SIMILAR`, detectado por correlación normalizada sobre una
-  rejilla 32×32) se etiquetan aparte. El recorte solo se busca en sensibilidad
-  Alta y sobre un conjunto acotado de pares.
-- **Sensibilidad como presets** — Baja/Media/Alta traducen a bandas de score y
-  a si se buscan recortes; Personalizada expone bandas, pesos y recortes. Los
-  porcentajes **no son verdad matemática**: representan lo que calculan los
-  algoritmos, y ante la duda se prefiere "posiblemente similar".
-- **Embeddings visuales (CLIP) aislados y opcionales** — `core/embeddings.py`
-  carga el modelo de forma perezosa; sin el extra `[ai]` instalado,
-  `available()` es False y el resto del programa funciona igual. Cuando está,
-  actúa como **voto de confirmación/rechazo** sobre aristas dudosas (rescata un
-  borderline con "misma escena", descarta una coincidencia de hash con "escena
-  distinta"). Se descartó hacerlo obligatorio por el peso de torch.
-- **Vídeo: FFmpeg por subproceso**, como pide el enunciado (detectar,
-  configurar ruta). `imageio-ffmpeg` es un *fallback opcional* (binario
-  embebido). Se descartó **PyAV** (wheel grande, duplica libav). Los
-  fotogramas se canalizan como PNG por *stdout* (sin ficheros temporales) y se
-  comparan por pHash. Dos vídeos **nunca** se llaman "idénticos" a partir de
-  unos fotogramas: el máximo veredicto es "mismo contenido probable".
-- **Grupos de vídeo con dos tipos de arista** — un `union-find` une los vídeos
-  por SHA-256 idéntico **y** por fotogramas cercanos, así el original, su copia
-  exacta y su recompresión caen en un solo grupo cuya categoría es la del
-  enlace más débil.
-- **Tema por `QPalette`, no por `QWidget { color }`** — la regla de color en el
-  stylesheet no se limpia al cambiar de hoja (dejaba texto blanco sobre fondo
-  claro). Ahora los colores base van en una `QPalette` clara/oscura +
-  `Fusion` + re-*polish* de los widgets; el stylesheet solo lleva estructura.
-- **Hashing en paralelo** con `ThreadPoolExecutor` — la lectura de disco y
-  `hashlib` liberan el GIL, así que varios hilos aceleran de verdad. El
-  número de *workers* es configurable. La sumisión de tareas está acotada
-  (no se encolan 100.000 futuros de golpe).
-- **Pausa/cancelación cooperativa** (`RunController`) — sin matar hilos a la
-  fuerza: el trabajo consulta `checkpoint()` con frecuencia, que bloquea
-  mientras está en pausa y devuelve `False` al cancelar. Una cancelación
-  devuelve un resultado **parcial** claramente marcado.
-- **Miniaturas** — nunca se cargan imágenes a resolución completa en la lista;
-  se generan miniaturas PNG con caché en memoria (LRU) y en disco (clave =
-  ruta + tamaño + mtime), y se renderizan **fuera del hilo de la UI** con un
-  `QThreadPool`. La orientación EXIF se normaliza solo para mostrar.
-- **Rutas largas de Windows** — `file_utils.extended_path` antepone `\\?\`
-  antes de abrir/`stat` archivos (hashing, metadatos, escaneo, caché).
-- **Eliminación segura** — `Send2Trash` (papelera nativa en los tres SO) es el
-  camino por defecto; la eliminación permanente es un modo explícito. Cada
-  archivo se re-verifica justo antes de borrarlo (existe, es archivo, no ha
-  cambiado de tamaño); lo dudoso se **omite y se informa**, nunca se fuerza.
-  Todo intento — con éxito o no — se escribe en `OperationHistory`
-  (SQLite propio, separado de la caché). Si `Send2Trash` falta en tiempo de
-  ejecución, la app **no borra**: informa y sugiere instalarla.
-- **Borrado fuera del hilo de UI** — `DeletionRunner` usa un
-  `threading.Thread` (no `moveToThread`) y sus señales llegan a la UI por
-  conexión en cola; así una unidad de red lenta o un lote grande no congela la
-  ventana, y no hay riesgo de tocar widgets desde otro hilo.
-- **El estado "read-only por defecto" se mantiene** — en la pestaña de
-  duplicados todo *marca* decisiones; los únicos puntos que escriben en el
-  disco del usuario son `DeletionManager` (borrar) y `renamer` (renombrar), y
-  ambos exigen un diálogo de confirmación. Fuera de eso solo se escriben la
-  config, el log, la caché y el historial, cada uno en su carpeta del sistema.
-- **Renombrado en dos fases** — `renamer.apply_renames()` renombra primero
-  todo a un nombre temporal único y luego al definitivo, así un intercambio
-  `A.jpg`↔`B.jpg` o cualquier ciclo es seguro. Antes de cada paso comprueba que
-  el destino no exista (nunca sobrescribe) y revierte si algo falla. Cada
-  operación va al historial con `action="rename"` y `undo_renames()` la
-  invierte. La fecha se toma de EXIF y, solo si no hay, de `st_mtime` (que
-  siempre existe) — nunca se inventa una fecha.
-
-**Sustituciones respecto al enunciado (documentadas):**
-
-- `utils/logging.py` → `utils/logging_setup.py` para no ensombrecer el módulo
-  `logging` de la librería estándar.
-- El escaneo vive de momento dentro de `core/analysis.py` (como primera etapa
-  del pipeline) en lugar de un `workers/scan_worker.py` separado; se separará si
-  en fases futuras se necesita lanzarlo aislado.
-- `Send2Trash` en lugar de reimplementar la papelera a mano (spec XDG en Linux,
-  `IFileOperation` en Windows, Finder en macOS): la librería es MIT y sin
-  dependencias transitivas.
-- `database/cache.py` del enunciado no existe como tal: la lógica de caché
-  está en `core/analysis.py` + `database/`. `utils/logging.py` es
-  `logging_setup.py`. Todo lo demás del árbol propuesto está creado.
-- `imageio-ffmpeg` es **opcional** (fallback): lo primario es el FFmpeg del
-  sistema, como pide el enunciado.
+* **Peak RSS stays flat** as N grows: streaming hashes, images decoded one
+  at a time and released, an LRU thumbnail cache (max 400). No UI memory
+  leak browsing hundreds of groups.
+* Linear extrapolation: **100,000 images ≈ 2 min** (exact) / **≈ 5 min**
+  (+perceptual); the incremental run is then a matter of seconds.
+* Real 12 MP photos decode slower per image; the architecture (parallel +
+  streaming + cache) stays the same.
 
 ---
 
-## Licencia
+## Architecture and technical decisions
 
-Este proyecto se publica bajo la **licencia MIT** (ver [`LICENSE`](LICENSE)).
+`app/core/*` holds pure logic with no Qt import — the pipeline
+(`run_analysis`) works through callbacks that the Qt workers translate into
+signals, so most of the logic is tested without ever starting a GUI. Each
+tool (duplicates, rename, import, organize) is a self-contained core module
+plus a thin worker (background thread) plus a view (PySide6 widget); moves
+and deletions always go through a verify-then-act step and are logged to an
+undoable history.
 
-### Dependencias de terceros
+The full file-by-file map, the reasoning behind each significant decision
+(why a custom perceptual hash instead of `imagehash`, why SQLite in one
+thread, why FFmpeg via subprocess, why Spanish is the UI's source language,
+and more), scale/performance limits and known limitations all live in
+[`ROADMAP.md`](ROADMAP.md) — kept there instead of duplicated here so it
+never drifts out of sync with the code.
 
-| Paquete | Licencia | Notas |
+---
+
+## License
+
+This project is published under the **MIT license** (see
+[`LICENSE`](LICENSE)).
+
+### Third-party dependencies
+
+| Package | License | Notes |
 |---|---|---|
-| **PySide6 / Qt** | LGPL v3 | Enlace dinámico. Para distribuir **binarios** hay que permitir sustituir las librerías Qt (el empaquetado *one-folder* de PyInstaller ya lo permite) e incluir el texto de la LGPL. |
-| **Pillow** | MIT-CMU (HPND) | Permisiva. |
-| **Send2Trash** | BSD | Permisiva. |
-| `imageio-ffmpeg` *(opcional)* | BSD, pero **empaqueta un binario de FFmpeg compilado con `--enable-gpl`** | El **código fuente** en GitHub no se ve afectado. Pero **no distribuyas un ejecutable que incluya ese FFmpeg** salvo bajo GPL: para releases binarias, usa el FFmpeg del sistema o un build LGPL y no empaquetes `imageio-ffmpeg`. |
-| `open-clip-torch`, `torch` *(opcional, extra `[ai]`)* | MIT / BSD | Los pesos del modelo se descargan en tiempo de ejecución. |
+| **PySide6 / Qt** | LGPL v3 | Dynamically linked. Distributing **binaries** requires allowing the Qt libraries to be swapped out (PyInstaller's *one-folder* packaging already allows this) and including the LGPL text. |
+| **Pillow** | MIT-CMU (HPND) | Permissive. |
+| **Send2Trash** | BSD | Permissive. |
+| `imageio-ffmpeg` *(optional)* | BSD, but **bundles an FFmpeg binary built with `--enable-gpl`** | The **source code** on GitHub is unaffected. But **do not distribute an executable that includes that FFmpeg** except under the GPL: for binary releases, use the system FFmpeg or an LGPL build, and don't bundle `imageio-ffmpeg`. |
+| `open-clip-torch`, `torch` *(optional, `[ai]` extra)* | MIT / BSD | Model weights are downloaded at runtime. |
 
-**En resumen:** publicar el **código fuente** con licencia MIT no tiene ningún
-problema. Al generar **ejecutables para distribuir**, ten en cuenta la LGPL de
-Qt y, si empaquetas `imageio-ffmpeg`, la GPL de ese FFmpeg.
+**In short:** publishing the **source code** under the MIT license is fine.
+When building **executables for distribution**, keep Qt's LGPL in mind, and
+the GPL of that FFmpeg if you bundle `imageio-ffmpeg`.

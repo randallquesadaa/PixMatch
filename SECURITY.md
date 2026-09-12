@@ -24,7 +24,7 @@ modifies them during analysis. Relevant risks:
 |---|---|
 | Parsing a crafted image/video to crash, hang, or execute code | Social-engineering the user into deleting their own files |
 | Path handling that escapes the selected folder | Bugs that need a already-compromised machine |
-| The delete / rename operations touching an unintended file | The optional `[ai]` extra downloading model weights over HTTPS |
+| The delete / rename / import / organize operations touching an unintended file | The optional `[ai]` extra downloading model weights over HTTPS |
 | A dependency with a known CVE reaching a release build | Denial of service from an absurdly large library (bounded, documented) |
 
 ## Hardening already in place
@@ -33,8 +33,8 @@ modifies them during analysis. Relevant risks:
   bomb cannot exhaust memory.
 - FFmpeg/ffprobe are invoked with a resolved absolute path and a fixed argument
   list, never through a shell.
-- Every destructive action (trash, permanent delete, rename) is explicit,
-  confirmed, re-validated immediately before it runs, and written to an
-  undoable operation log.
+- Every destructive action (trash, permanent delete, rename, import, organize)
+  is explicit, confirmed, re-validated immediately before it runs, and written
+  to an undoable operation log.
 - CI runs `ruff`, `bandit`, `pip-audit`, CodeQL and dependency review on every
   change; releases are built only from a commit that passed all of them.

@@ -98,7 +98,7 @@ class DuplicateGroup:
     records: list[FileRecord]
     ignored: bool = False
     similarity_percent: float | None = None  # representative, for "similar" groups
-    match_reasons: list[str] = field(default_factory=list)  # "por qué se agruparon"
+    match_reasons: list[str] = field(default_factory=list)  # "why they were grouped"
 
     @property
     def confidence(self) -> int:
