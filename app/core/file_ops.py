@@ -25,6 +25,9 @@ def os_error_message(exc: OSError) -> str:
 
 
 def silent_remove(path: str) -> None:
+    """Best-effort cleanup of a leftover temp file after a failed copy. The
+    caller already has its own error to report; whether this succeeds or not
+    changes nothing for the source file, which is what actually matters."""
     try:
         os.remove(extended_path(path))
     except OSError:
@@ -133,6 +136,9 @@ def verified_copy_move(
     try:
         shutil.copystat(real_src, real_tmp)
     except OSError:
+        # Preserving mtime/permissions is a nice-to-have, not a correctness
+        # requirement -- the move still proceeds and the file still lands
+        # intact even if the filesystem refuses to copy metadata (e.g. FAT).
         pass
 
     try:
