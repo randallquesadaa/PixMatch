@@ -98,6 +98,22 @@ class AppConfig:
     rename_lowercase_ext: bool = True
     rename_normalise_jpeg: bool = True  # .jpeg/.jpe -> .jpg
 
+    # import / organise tool (move from a phone/card into an ordered library)
+    import_library_folder: str = ""  # destination photo library root
+    import_source_folder: str = ""  # last source folder (session memory)
+    import_pattern: str = "%Y%m%d_%H%M%S"
+    import_include_videos: bool = True
+    import_lowercase_ext: bool = True
+    import_normalise_jpeg: bool = True
+    import_no_location_label: str = "Sin ubicación"
+    import_country_aliases: dict = field(default_factory=dict)
+    import_match_pixel_identical: bool = True
+
+    # organize tool (rearrange an already-existing library in place; shares
+    # the naming settings above -- it is the same convention, just applied
+    # without a separate source/destination)
+    organize_root_folder: str = ""  # last folder organised (session memory)
+
     # storage
     use_cache: bool = True  # SQLite analysis cache
     cache_db_path: str = ""  # empty -> default location

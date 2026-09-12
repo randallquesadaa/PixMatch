@@ -132,6 +132,13 @@ class RenameReport:
 
 
 # ---------------------------------------------------------------------------
+def parse_datetime_string(value) -> datetime | None:
+    """Parse an EXIF ``YYYY:MM:DD HH:MM:SS`` / ISO-8601 timestamp, tolerating a
+    sub-second or timezone tail. ``None`` if it cannot be read. Shared with the
+    import/organise tool (for video ``creation_time``)."""
+    return _parse_exif_datetime(value)
+
+
 def _parse_exif_datetime(value) -> datetime | None:
     if not value:
         return None
@@ -210,7 +217,12 @@ def capture_datetime(
 
 
 # ---------------------------------------------------------------------------
-def _format_name(dt: datetime, pattern: str, prefix: str, ext: str) -> str:
+def format_name(dt: datetime, pattern: str, prefix: str, ext: str) -> str:
+    """Build a file name from a timestamp: ``{prefix}{dt:pattern}{ext}``.
+
+    Invalid path characters are stripped; a bad pattern falls back to
+    :data:`DEFAULT_PATTERN`. Shared with the import/organise tool.
+    """
     pattern = pattern.replace("/", "-").replace("\\", "-").strip() or DEFAULT_PATTERN
     try:
         base = dt.strftime(pattern)
@@ -259,7 +271,7 @@ def build_rename_plan(
         ext = stem_ext.lower() if lowercase_ext else stem_ext
         if normalise_jpeg and ext in (".jpeg", ".jpe", ".jfif"):
             ext = ".jpg"
-        new_name = _format_name(dt, pattern, prefix, ext)
+        new_name = format_name(dt, pattern, prefix, ext)
         status = RenameStatus.UNCHANGED if new_name == old_name else RenameStatus.RENAME
         plans.append(
             RenamePlan(

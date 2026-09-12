@@ -1,308 +1,439 @@
-# Arquitectura y decisiones técnicas
+# Architecture and technical decisions
 
-Documento de referencia para quien quiera entender o contribuir al proyecto.
-Para *qué hace* la aplicación y cómo usarla, ver el [README](README.md).
-
----
-
-## Principios de diseño
-
-1. **Ningún cambio silencioso en los archivos del usuario.** El análisis de
-   duplicados es de solo lectura. Borrar y renombrar exigen confirmación
-   explícita, quedan en un historial y el renombrado se puede deshacer.
-2. **Nunca "duplicado" sin explicar de qué tipo.** Cada coincidencia lleva una
-   etiqueta específica (archivo idéntico / pixel idéntico / redimensionado /
-   recorte / muy similar / …) y, para las similitudes, un porcentaje que
-   representa lo que calculan los algoritmos, no una verdad matemática.
-3. **Nunca agrupar por nombre, tamaño o resolución solos.** Siempre hay
-   evidencia real (hash criptográfico, píxeles decodificados, hashes
-   perceptuales, fotogramas).
-4. **La interfaz nunca se congela.** Todo el trabajo pesado va en hilos; la UI
-   solo recibe señales.
-5. **Robustez.** Un archivo corrupto, bloqueado o sin permisos se registra y el
-   análisis continúa. Los errores técnicos van a un log rotativo, no a la
-   interfaz (`Configuración → Logs`).
+Reference document for anyone who wants to understand or contribute to the
+project. For *what* the app does and how to use it, see the
+[README](README.md).
 
 ---
 
-## Mapa del código
+## Design principles
+
+1. **No silent change to the user's files.** Duplicate analysis is
+   read-only. Deleting and renaming require explicit confirmation, are
+   logged to a history, and renaming can be undone.
+2. **Never "duplicate" without saying what kind.** Every match carries a
+   specific label (identical file / identical pixels / resized / crop / very
+   similar / …) and, for similarity matches, a percentage that represents
+   what the algorithms compute, not mathematical truth.
+3. **Never group by name, size or resolution alone.** There is always real
+   evidence (a cryptographic hash, decoded pixels, perceptual hashes, video
+   frames).
+4. **The interface never freezes.** All heavy work runs on background
+   threads; the UI only ever receives signals.
+5. **Robustness.** A corrupted, locked or permission-denied file is logged
+   and analysis continues. Technical errors go to a rotating log, not the
+   UI (`Settings → Logs`).
+
+---
+
+## Code map
 
 ```
 app/
-  main.py               entry point: --version/--help, logging, QApplication, icono, HiDPI
-  config.py             AppConfig (JSON persistente en la carpeta de config del SO)
-  i18n.py               tr() + tabla ES→EN (el español es el idioma fuente)
+  main.py               entry point: --version/--help, logging, QApplication, icon, HiDPI
+  config.py             AppConfig (JSON persisted in the OS config folder)
+  i18n.py               tr() + ES→EN table (Spanish is the source language)
 
-  core/                  lógica pura, sin Qt — se prueba sin arrancar la GUI
-    scanner.py           escaneo recursivo iterativo; FileKind, ScanStats, ScanOptions
-    hashing.py           hash_file (SHA-256 en streaming, cancelable), partial_signature
-    metadata.py          read_image_info (EXIF, cámara, fecha), file_timestamps
-    similarity.py        MatchCategory (7 categorías + colores), classify_*, category_confidence
-    perceptual.py        pHash / dHash / aHash / bHash (composición 16×16), BK-tree
-    color_hist.py        firma de color Hue-Saturación (64 bins) + intersección de histogramas
-    image_features.py    compute_signatures(): todas las firmas de una imagen en un solo decode
-    similarity_engine.py combined_score() ponderado + motivos + ascensos de categoría;
-                         SimilarityBands; perfiles de sensibilidad (presets + personalizado)
-    crop_detect.py       detect_crop(): correlación normalizada sobre rejilla, score + región
-    embeddings.py        backend CLIP opcional (open_clip), carga perezosa, encode/decode
+  core/                  pure logic, no Qt — tested without starting the GUI
+    scanner.py           iterative recursive scan; FileKind, ScanStats, ScanOptions
+    hashing.py           hash_file (streaming, cancelable SHA-256), partial_signature
+    metadata.py          read_image_info (EXIF, camera, date), file_timestamps
+    similarity.py        MatchCategory (7 categories + colors), classify_*, category_confidence
+    perceptual.py        pHash / dHash / aHash / bHash (16×16 layout), BK-tree
+    color_hist.py        Hue-Saturation color signature (64 bins) + histogram intersection
+    image_features.py    compute_signatures(): every signature for an image in one decode
+    similarity_engine.py combined_score() weighted + reasons + category promotion;
+                         SimilarityBands; sensitivity profiles (presets + custom)
+    crop_detect.py       detect_crop(): normalized grid correlation, score + region
+    embeddings.py        optional CLIP backend (open_clip), lazy loading, encode/decode
     image_analyzer.py    pixel_digest, pixels_equal, difference_image
-    ffmpeg.py            detect() (ruta configurada / PATH / imageio-ffmpeg), install_hint
+    ffmpeg.py            detect() (configured path / PATH / imageio-ffmpeg), install_hint
     video_analyzer.py    probe_video, extract_frame_hashes, compare_frame_hashes
     duplicate_groups.py  FileRecord, Decision, DuplicateGroup, AnalysisResult,
-                         build_groups (capas: pixel → sha → similitud/recorte → vídeo)
-    analysis.py          run_analysis(): pipeline escalonado + callbacks + caché
-    recommendation.py    recommend_keep(): sugerencia NO vinculante (KEEP_SCORE ponderado)
-    deletion_manager.py  build_preview / build_preview_for, DeletionManager (papelera / permanente)
-    renamer.py           renombrado por fecha (EXIF / mtime), sin sobrescribir, dos fases, undo
+                         build_groups (layers: pixel → sha → similarity/crop → video)
+    analysis.py          run_analysis(): staged pipeline + callbacks + cache
+    recommendation.py    recommend_keep(): NON-binding suggestion (weighted KEEP_SCORE)
+    deletion_manager.py  build_preview / build_preview_for, DeletionManager (recycle bin / permanent)
+    renamer.py           renaming by date (EXIF / mtime), never overwrites, two phases, undo;
+                         format_name(), parse_datetime_string() (shared)
+    geo.py               gps_from_exif / parse_iso6709 (ISO 6709) + CountryResolver
+                         (pure-Python point-in-polygon over resources/country_borders.json)
+    importer.py          build_import_plan / apply_import / undo_import; LibraryIndex
+                         (SHA-256 with a size prefilter + pixels with a dimension prefilter);
+                         also exposes what is shared with organizer.py: fold_name(),
+                         capture_moment(), resolve_location(), resolve_country_folder(),
+                         existing_country_dirs(), assign_unique_dest_names()
+    organizer.py         build_organize_plan / apply_organize / undo_organize: rearranges a
+                         folder over itself with the same structure, without evaluating
+                         anything (no duplicates, no "already there") — only moves or leaves as is
+    file_ops.py          verified_copy_move() (copy → verify SHA-256 → replace →
+                         remove source) + makedirs_tracked/prune_empty_parents/safe_size,
+                         shared by importer.py and organizer.py
     export.py            export_csv / export_json / export_html
 
-  database/
-    models.py            esquema SQL + CachedFile
-    database.py          FileCacheDB (una conexión, lecturas al inicio, escrituras al final)
-    history.py           OperationHistory (auditoría de borrados/renombrados, SQLite propio)
+  resources/
+    country_borders.json simplified Natural Earth 1:50m admin_0 (public domain);
+                         generated by scripts/build_country_borders.py
 
-  workers/                adaptadores Qt: hilo de fondo + señales en cola
+  database/
+    models.py            SQL schema + CachedFile
+    database.py          FileCacheDB (one connection, reads up front, writes at the end)
+    history.py           OperationHistory (audit trail of deletions/renames/imports)
+
+  workers/                Qt adapters: background thread + queued signals
     analysis_worker.py   AnalysisWorker + AnalysisController (QThread)
     deletion_worker.py   DeletionRunner (threading.Thread)
     rename_worker.py     RenamePreviewRunner + RenameApplyRunner
+    import_worker.py     ImportPreviewRunner + ImportApplyRunner
+    organize_worker.py   OrganizePreviewRunner + OrganizeApplyRunner
 
   ui/                     PySide6
-    main_window.py        QTabWidget: «Duplicados» + «Renombrar por fecha»; toolbar, atajos
-    duplicate_view.py     navegador de grupos (filtros / orden / búsqueda / lado a lado)
-    rename_view.py        tabla de vista previa de renombrado + aplicar + deshacer
-    image_viewer.py       visor ampliado: zoom / pan, ◀▶ por el grupo, decisiones
-    advanced_compare.py   "Comparar en detalle": Normal / Lado a lado / Diferencia / Superposición
-    video_viewer.py       VideoCompareDialog (fotograma + metadatos + score)
+    main_window.py        QTabWidget: "Duplicates" + "Rename" + "Import & organize" +
+                          "Organize library"
+    duplicate_view.py     group browser (filters / sorting / search / side by side)
+    rename_view.py        rename preview table + apply + undo
+    import_view.py        import preview table + verified move + undo
+    organize_view.py      reorganize preview table + move + undo (no "already there"
+                          checkbox: there is nothing to evaluate here)
+    image_viewer.py       zoomed-in viewer: zoom / pan, ◀▶ through the group, decisions
+    advanced_compare.py   "Compare in detail": Normal / Side by side / Difference / Overlay
+    video_viewer.py       VideoCompareDialog (frame + metadata + score)
     deletion_dialog.py    DeletionConfirmDialog + HistoryDialog
-    settings_dialog.py    General / Escaneo / Exclusiones / Logs
-    theme.py              QPalette claro/oscuro (contraste AA) + QSS de estructura
+    settings_dialog.py    General / Scanning / Exclusions / Logs
+    theme.py              light/dark QPalette (AA contrast) + structural QSS
     widgets/
-      file_card.py         tarjeta de archivo (miniatura + datos + decisión + acciones)
-      thumbnail_loader.py  miniaturas fuera del hilo de UI (QThreadPool)
+      file_card.py         file card (thumbnail + data + decision + actions)
+      thumbnail_loader.py  thumbnails off the UI thread (QThreadPool)
 
   utils/
-    paths.py              carpetas de config/cache/data/logs por plataforma
-    logging_setup.py      log rotativo
-    control.py            RunController (pausa / reanudar / cancelar cooperativo)
-    file_utils.py         tamaños legibles, rutas largas de Windows (\\?\), abrir archivo/carpeta
-    thumbnail_cache.py    caché de miniaturas: memoria (LRU) + disco; imágenes y fotograma de vídeo
+    paths.py              per-platform config/cache/data/log folders
+    logging_setup.py      rotating log
+    control.py            RunController (cooperative pause / resume / cancel)
+    file_utils.py         human-readable sizes, Windows long paths (\\?\), open file/folder
+    thumbnail_cache.py    thumbnail cache: memory (LRU) + disk; images and video frames
 
 packaging/   PixMatch.spec (PyInstaller) + build_{linux,macos,windows}.* + resources/icon.*
-scripts/     benchmark.py
-tests/       ~170 tests con pytest (los de vídeo/IA se saltan si falta el binario/backend)
+scripts/     benchmark.py, build_country_borders.py
+tests/       ~200 pytest tests (video/AI ones are skipped if the binary/backend is missing)
 ```
 
 ---
 
-## El pipeline de análisis (escalonado)
+## The analysis pipeline (staged)
 
-`core/analysis.py :: run_analysis()` — cada etapa cara solo se ejecuta sobre
-los candidatos que la anterior no descartó, y todo es *cache-aware*:
+`core/analysis.py :: run_analysis()` — each expensive stage only runs on the
+candidates the previous one didn't rule out, and everything is
+*cache-aware*:
 
-1. **Escaneo** — recorre carpeta + subcarpetas. Ignora symlinks de directorio
-   (anti-ciclos, con control por `(dev, inode)`). Unicode y espacios nativos.
-2. **Agrupación previa por tamaño** — solo una optimización; el tamaño nunca
-   define un duplicado.
-3. **SHA-256** — hash completo en streaming de los archivos que comparten
-   tamaño → `ARCHIVO IDÉNTICO`.
-4. **Comparación de píxeles** — decodifica los candidatos con **dimensiones
-   coincidentes** (orientación EXIF normalizada en memoria), SHA-256 de los
-   píxeles → `PIXEL IDÉNTICO` (distinto de `ARCHIVO IDÉNTICO`).
-5. **Firmas de imagen** (opt-in) — pHash + dHash + aHash + bHash + histograma
-   de color, en un solo decode por imagen.
-6. **Embeddings visuales** (opt-in, extra `[ai]`) — CLIP, como voto de
-   confirmación/rechazo en aristas dudosas.
-7. **Detección de recortes** (solo sensibilidad Alta) — sobre pares con aspecto
-   distinto y paleta parecida.
-8. **Vídeo** (opt-in, necesita FFmpeg) — hash de archivo, metadatos por
-   ffprobe/`ffmpeg -i`, y muestreo de 5 fotogramas + pHash.
-9. **Agrupación** — `build_groups()` combina las capas con union-find.
+1. **Scan** — walks the folder + subfolders. Skips directory symlinks
+   (anti-cycle, tracked by `(dev, inode)`). Native Unicode and spaces.
+2. **Pre-grouping by size** — an optimization only; size never defines a
+   duplicate.
+3. **SHA-256** — full streaming hash of files that share a size →
+   `IDENTICAL FILE`.
+4. **Pixel comparison** — decodes candidates with **matching dimensions**
+   (EXIF orientation normalized in memory), SHA-256 of the pixels →
+   `PIXEL IDENTICAL` (distinct from `IDENTICAL FILE`).
+5. **Image signatures** (opt-in) — pHash + dHash + aHash + bHash + color
+   histogram, in a single decode per image.
+6. **Visual embeddings** (opt-in, `[ai]` extra) — CLIP, as a
+   confirm/reject vote on uncertain edges.
+7. **Crop detection** (High sensitivity only) — over pairs with a different
+   aspect ratio and a similar palette.
+8. **Video** (opt-in, needs FFmpeg) — file hash, metadata via
+   ffprobe/`ffmpeg -i`, and sampling 5 frames + pHash.
+9. **Grouping** — `build_groups()` merges the layers with union-find.
 
-La caché SQLite guarda todas las firmas por archivo; un reanálisis solo
-recalcula lo que cambió de tamaño o fecha de modificación.
+The SQLite cache stores every per-file signature; a re-analysis only
+recomputes what changed size or modification date.
 
 ---
 
-## Motor de similitud (`similarity_engine.py`)
+## Similarity engine (`similarity_engine.py`)
 
-`combined_score(a, b, weights)` = media ponderada de 5 señales, con pesos
-configurables:
+`combined_score(a, b, weights)` = weighted average of 5 signals, with
+configurable weights:
 
-| Señal | Peso por defecto | Qué capta |
+| Signal | Default weight | What it captures |
 |---|---|---|
-| pHash (DCT 32→8) | 40 % | estructura de frecuencias |
-| dHash | 20 % | gradientes / bordes |
-| aHash | 10 % | tono general |
-| histograma de color HS | 10 % | paleta (ignora brillo) |
-| bHash (bloques 16×16) | 20 % | composición espacial |
+| pHash (DCT 32→8) | 40% | frequency structure |
+| dHash | 20% | gradients / edges |
+| aHash | 10% | overall tone |
+| HS color histogram | 10% | palette (ignores brightness) |
+| bHash (16×16 blocks) | 20% | spatial layout |
 
-El histograma de color y el bHash son los que **evitan el falso positivo
-clásico**: dos fotos distintas con colores parecidos (p. ej. dos atardeceres)
-tienen pHash cercano pero composición y/o distribución de color distintas.
+The color histogram and bHash are what **prevent the classic false
+positive**: two different photos with similar colors (e.g. two sunsets)
+have a close pHash but a different layout and/or color distribution.
 
-Bandas de score configurables → categoría; por debajo de la banda "similar" no
-se agrupa. Presets de **sensibilidad** Baja / Media / Alta (Alta también activa
-la detección de recortes); "Personalizada" expone bandas, pesos y recortes.
+Configurable score bands map to a category; below the "similar" band
+nothing groups. Sensitivity presets Low / Medium / High (High also enables
+crop detection); "Custom" exposes bands, weights and crop detection.
 
-El motor también devuelve los **motivos** ("Se agruparon porque: ✓ …") y puede
-*ascender* la categoría a `REDIMENSIONADO` (misma imagen, otra resolución) o
-`RECORTE`.
+The engine also returns the **reasons** ("Grouped because: ✓ …") and can
+*promote* the category to `RESIZED` (same image, another resolution) or
+`CROPPED`.
 
 ---
 
-## Decisiones técnicas
+## Technical decisions
 
-### Núcleo sin Qt
-`app/core/*` no importa PySide6. El pipeline usa *callbacks*; los `*Worker`
-los traducen a señales Qt. Así ~80 % de la lógica se prueba sin GUI.
+### A Qt-free core
+`app/core/*` never imports PySide6. The pipeline uses *callbacks*; the
+`*Worker` classes translate them into Qt signals. That keeps ~80% of the
+logic testable without a GUI.
 
-### Hashes perceptuales propios, sin numpy ni `imagehash`
-pHash necesita un DCT 8×8: hacerlo a mano cuesta ~10 k multiplicaciones por
-imagen (nada frente a decodificar) y evita arrastrar numpy/scipy al
-empaquetado. Un solo decode produce las 4 hashes + el histograma de color.
-Cambiar a numpy más adelante sería un cambio local a `perceptual.py` /
+### Custom perceptual hashes, no numpy or `imagehash`
+pHash needs an 8×8 DCT: doing it by hand costs ~10k multiplications per
+image (nothing next to decoding) and avoids dragging numpy/scipy into
+packaging. A single decode produces all 4 hashes plus the color histogram.
+Switching to numpy later would be a local change to `perceptual.py` /
 `image_features.py`.
 
-### Comparación de píxeles sin O(n²)
-En vez de comparar cada par, se calcula un SHA-256 de los píxeles normalizados
-(orientación EXIF en memoria, todo a RGBA) y se agrupa por igualdad de ese
-digest. Cada imagen se abre una vez y se libera; solo se decodifican los
-candidatos con dimensiones coincidentes.
+### Pixel comparison without O(n²)
+Instead of comparing every pair, a SHA-256 of the normalized pixels (EXIF
+orientation applied in memory, everything converted to RGBA) is computed and
+files are grouped by equality of that digest. Each image is opened once and
+released; only candidates whose dimensions match another image are decoded.
 
-### Tema por `QPalette`, no por `QWidget { color }`
-La regla de color en el stylesheet de Qt no se limpia al cambiar de hoja
-(dejaba texto blanco sobre fondo claro). Los colores base van en una paleta
-clara/oscura + `Fusion` + re-*polish* de los widgets; el stylesheet solo lleva
-estructura y resuelve colores con `palette(...)`. El texto atenuado usa un rol
-propio, separado del color de borde, para poder tener bordes sutiles sin
-sacrificar el contraste (un test calcula el ratio WCAG y falla si baja de
-4.5 : 1).
+### Theme via `QPalette`, not `QWidget { color }`
+A color rule in a Qt stylesheet doesn't get cleared when the stylesheet
+changes (it left white text on a light background). Base colors live in a
+light/dark palette + `Fusion` + a widget re-*polish*; the stylesheet only
+carries structure and resolves colors via `palette(...)`. Dimmed text uses
+its own role, separate from the border color, so it can have subtle borders
+without sacrificing contrast (a test computes the WCAG ratio and fails if it
+drops below 4.5:1).
 
-### Caché e historial SQLite en un solo hilo
-`run_analysis` abre la BD en el hilo del worker, lee todo al principio y
-escribe todo al final; los hilos del pool nunca tocan SQLite. Si el fichero
-está corrupto, `FileCacheDB` degrada a no-op y el análisis sigue sin caché. La
-validez de una fila se decide por `(tamaño, mtime)`; los valores `None` nunca
-se dan por buenos.
+### SQLite cache and history on a single thread
+`run_analysis` opens the database on the worker thread, reads everything up
+front and writes everything at the end; pool threads never touch SQLite. If
+the file is corrupted, `FileCacheDB` degrades to a no-op and analysis
+continues without a cache. A row's validity is decided by `(size, mtime)`;
+`None` values are never taken at face value.
 
-### Borrado y renombrado fuera del hilo de UI
-`DeletionRunner` / `RenameApplyRunner` usan un `threading.Thread` (no
-`moveToThread`) y sus señales llegan a la UI por conexión en cola. Un disco de
-red lento o un lote grande no congela la ventana ni toca widgets desde otro
-hilo.
+### Deletion and renaming off the UI thread
+`DeletionRunner` / `RenameApplyRunner` use a `threading.Thread` (not
+`moveToThread`), and their signals reach the UI through a queued connection.
+A slow network drive or a large batch never freezes the window or touches
+widgets from another thread.
 
-### Eliminación segura
-Modo **papelera** (`Send2Trash`, nativo en Windows/macOS/Linux) por defecto;
-la eliminación permanente es un modo aparte y explícito. Si `Send2Trash` falta,
-la app **no borra**: informa. Cada archivo se re-verifica justo antes de
-borrarlo (existe, es archivo regular, tamaño sin cambios); lo dudoso se omite y
-se informa. Todo va al historial.
+### Safe deletion
+**Recycle bin** mode (`Send2Trash`, native on Windows/macOS/Linux) by
+default; permanent deletion is a separate, explicit mode. If `Send2Trash` is
+missing, the app **does not delete**: it reports the problem. Each file is
+re-verified right before deletion (it exists, is a regular file, size
+unchanged); anything doubtful is skipped and reported. Everything goes to
+the history.
 
-### Renombrado en dos fases
-`renamer.apply_renames()` renombra primero todo a un nombre temporal único y
-luego al definitivo, así un intercambio `A↔B` o cualquier ciclo es seguro.
-Comprueba que el destino no exista (nunca sobrescribe; añade sufijo `_2`, `_3`…
-determinista y por carpeta) y revierte si algo falla. La fecha se toma de EXIF
-y, solo si no hay, de `st_mtime` — nunca se inventa. `undo_renames()` invierte
-la operación.
+### Two-phase renaming
+`renamer.apply_renames()` first renames everything to a unique temporary
+name, then to the final one, so an `A↔B` swap or any cycle is safe. It
+checks the destination doesn't already exist (never overwrites; adds a
+deterministic `_2`, `_3`… suffix per folder) and rolls back if anything
+fails. The date comes from EXIF and, only if there is none, from `st_mtime`
+— it is never invented. `undo_renames()` reverses the operation.
 
-### Vídeo: FFmpeg por subproceso
-`subprocess` a `ffmpeg`/`ffprobe` del sistema (detectado, con ruta
-configurable). Se descartó **PyAV** (wheel grande, duplica libav).
-`imageio-ffmpeg` es una **dependencia opcional** de conveniencia: si el usuario
-no tiene FFmpeg en el PATH y lo instala, el análisis de vídeo funciona sin
-configurar nada. Dos vídeos nunca se llaman "idénticos" a partir de unos
-fotogramas: el máximo veredicto es "mismo contenido probable".
+### Video: FFmpeg via subprocess
+`subprocess` to the system's `ffmpeg`/`ffprobe` (detected, with a
+configurable path). **PyAV** was ruled out (a large wheel, duplicates
+libav). `imageio-ffmpeg` is an **optional** convenience dependency: if the
+user has no FFmpeg on the PATH and installs it, video analysis works with
+zero configuration. Two videos are never called "identical" from a handful
+of frames: the strongest verdict is "likely same content".
 
-### i18n ligero
-`tr()` con tabla ES→EN en memoria; el español es el idioma fuente (las claves
-*son* las cadenas en español), así una cadena sin traducir nunca sale vacía.
-Los combos guardan la clave canónica en `itemData` para que la lógica no
-dependa del idioma. Sin `gettext`/`.po` para no añadir toolchain de compilación.
+### Lightweight i18n
+`tr()` with an in-memory ES→EN table; Spanish is the source language (the
+keys *are* the Spanish strings), so an untranslated string is never blank.
+Combo boxes store the canonical key as `itemData` so logic never depends on
+the current language. No `gettext`/`.po` files, to avoid adding a
+translation-compilation toolchain.
+
+### Import & organize
+
+- **Offline, numpy-free geocoding.** The country comes from the file's own
+  GPS (EXIF in photos, the `location` ISO 6709 tag via ffprobe in videos).
+  `geo.CountryResolver` loads `resources/country_borders.json` (Natural
+  Earth 1:50m simplified with Douglas-Peucker, ~1.5 MB, public domain) and
+  does a *bounding-box* check plus **pure-Python ray-casting
+  point-in-polygon**. `reverse_geocoder` was ruled out (drags in
+  numpy/scipy, which the `.spec` deliberately **excludes**), as was any
+  online API (breaks the "read-only, no network" principle). A point that
+  falls in no polygon (a coastal city, GPS drift, a simplified border) is
+  **snapped to the nearest country** within ~11 km.
+- **Move = copy → verify → remove.** `file_ops.verified_copy_move()` copies
+  to a temp file at the destination, re-hashes it (SHA-256), and only then
+  `os.replace` + `os.remove`s the source. Safe across devices; if anything
+  fails, the source is left intact. Never overwrites (`_01`, `_02`… suffix
+  via `importer.assign_unique_dest_names()`).
+- **"Already there" at two levels.** `LibraryIndex` answers identical
+  SHA-256 with a **byte-size prefilter** (only files sharing a size with the
+  batch are ever hashed) and identical pixels with a **dimension prefilter**
+  (`prepare_dims()` reads headers, doesn't decode). It shares the
+  `FileCacheDB` with duplicate analysis: if the library was already
+  analyzed, nothing gets re-hashed or re-decoded. Only **exactly equal**
+  counts (bytes or pixels); an import is never skipped over similarity.
+- **File naming: a batch-wide suffix pass, not a per-file one.**
+  `importer.assign_unique_dest_names()` resolves, after the whole batch is
+  planned, which names collide in the same destination folder. A file with
+  no collision keeps its plain date name; as soon as two or more collide,
+  **all** of them get a zero-padded `_01`, `_02`… suffix — never one left
+  bare next to numbered ones. This mirrors the convention already found in
+  real libraries (verified against an already-organized external drive).
+  Shared by `importer.py` and `organizer.py`, each with its own status
+  values.
+- **Accent-tolerant folder matching.** `importer.fold_name()` (casefold +
+  strip diacritics) decides whether a country folder / the "no location"
+  label already exists in the library. Prevents creating `Sin ubicación`
+  next to an already-existing `Sin ubicacion` over a single accent mark.
+- **History.** `import` (a move) and `import-dupe` (a duplicate's source
+  sent to the recycle bin) actions. `undo_import()` reverses the moves.
+
+### Organize library
+
+Rearranges an **already-existing, disorganized** folder (an old drive) with
+the same structure, over itself — deliberately the "simple sibling" of
+importing: no `LibraryIndex`, no SHA/pixels to evaluate anything, no
+"already there" history.
+
+- **No evaluation, on purpose.** The explicit ask was "just arrange things,
+  without deleting or evaluating anything": `build_organize_plan()` computes
+  no hash to compare content, only for the NEW state or to verify the copy
+  in the cross-device *fallback*. Two files with identical bytes simply each
+  move to their own place (kept apart by a suffix if their names collide) —
+  there is no "duplicate" status in this module.
+- **Atomic rename, not a copy.** Since source and destination are almost
+  always the same drive, `organizer._relocate()` first tries `os.replace()`
+  (a same-filesystem rename: instant, and a rename can't corrupt bytes, so
+  nothing needs verifying). Only if the OS returns `EXDEV` (crossing to
+  another filesystem — e.g. a volume mounted inside the folder) does it fall
+  back to the same `file_ops.verified_copy_move()` importing uses. For
+  reorganizing a whole drive this avoids doubling all the I/O of copying
+  plus reading everything back again to hash it.
+- **Idempotent.** If a file is already exactly at
+  `<folder>/<Country>/<Year>/<Year-Month>/<date-name>`, the plan marks it
+  `UNCHANGED` and leaves it alone. Running the reorganization twice in a
+  row: the second time moves nothing.
+- **Reuses, rather than duplicates, the placement logic.**
+  `capture_moment()`, `resolve_location()`, `resolve_country_folder()`,
+  `existing_country_dirs()`, `fold_name()` and `assign_unique_dest_names()`
+  live in `importer.py` and `organizer.py` imports them as is — "where does
+  this file go" is exactly the same problem for an external source as for a
+  library reorganizing itself.
+- **History.** `organize` action. `undo_organize()` reverses the moves
+  (with the same `_relocate()`, in the opposite direction).
+- **An already-organized burst is idempotent, not a suffix that keeps
+  climbing.** `assign_unique_dest_names()` looks at
+  `os.listdir(dest_dir)` to decide which name is free — but a pending file
+  that **already lives in its own `dest_dir`** (the typical case: a burst
+  that already has `_01`/`_02` and just needs confirming) doesn't count its
+  own current name as "taken" or block its own slot; if the final name turns
+  out to match the one it already had, `build_organize_plan()` reclassifies
+  it as `UNCHANGED`. Without this, reorganizing twice in a row kept
+  renumbering the same burst (`_01/_02` → `_03/_04` → `_01/_02` → …) instead
+  of settling — verified and fixed against a real external drive with
+  thousands of already-organized bursts.
+- **Known limitation that remains.** If a file is about to **leave** a
+  folder (moving to another one) right when a *different* file, from
+  elsewhere, wants to **enter** that same folder with a colliding name, the
+  arriving one may get a suffix that, strictly, wasn't needed — never the
+  other way around (never two files with the same name). A rare case,
+  crossing two folders, with no safety risk: at worst, one extra suffix.
 
 ---
 
-## Integración continua y releases
+## Continuous integration and releases
 
-Workflows en `.github/workflows/`:
+Workflows in `.github/workflows/`:
 
-| Workflow | Cuándo | Qué hace |
+| Workflow | When | What it does |
 |---|---|---|
-| `ci.yml` | cada PR; llamado por `release.yml` | `ruff check` + `ruff format --check`; `bandit` (media+) + `pip-audit`; `pytest` con cobertura en Linux/macOS/Windows × Python 3.11-3.13 (con FFmpeg real). Un job `ci-ok` agrega el resultado → es el *required check* para fusionar. |
-| `codeql.yml` | push/PR a `main` + semanal | CodeQL Python, consultas `security-and-quality`. |
-| `dependency-review.yml` | cada PR | bloquea PRs que introducen CVEs altas o licencias GPL/AGPL. |
-| `release.yml` | push a `main` | reejecuta toda la CI; si pasa **y** `app/__init__.py::__version__` no tiene aún un tag `vX.Y.Z`, crea el tag sobre ese commit, compila con PyInstaller en las 3 plataformas y publica un GitHub Release con los archivos + `SHA256SUMS.txt`. |
+| `ci.yml` | every PR; called by `release.yml` | `ruff check` + `ruff format --check`; `bandit` (medium+) + `pip-audit`; `pytest` with coverage on Linux/macOS/Windows × Python 3.11-3.13 (with a real FFmpeg). A `ci-ok` job aggregates the result → it's the *required check* to merge. |
+| `codeql.yml` | push/PR to `main` + weekly | CodeQL Python, `security-and-quality` queries. |
+| `dependency-review.yml` | every PR | blocks PRs that introduce high-severity CVEs or GPL/AGPL licenses. |
+| `release.yml` | push to `main` | re-runs all of CI; if it passes **and** `app/__init__.py::__version__` has no `vX.Y.Z` tag yet, tags that commit, builds with PyInstaller on all 3 platforms, and publishes a GitHub Release with the files + `SHA256SUMS.txt`. |
 
-Decisiones:
+Decisions:
 
-- **Disparador de release = cambio de versión, no cada commit.** `main` recibe
-  muchos merges; solo los que suben `__version__` publican. Evita releases
-  ruidosas y da un control explícito con un diff de una línea.
-- **La CI se define una vez.** `ci.yml` tiene `workflow_call`; `release.yml` la
-  reutiliza con `uses:` en lugar de duplicar los jobs. `ci.yml` **no** se
-  dispara en push a `main` (lo hace `release.yml`), así no hay doble ejecución.
-- **Sin acciones de terceros para publicar.** El release se crea con el `gh`
-  CLI (preinstalado) y `GITHUB_TOKEN`; las únicas acciones externas son las
-  oficiales de GitHub (`checkout`, `setup-python`, `upload/download-artifact`,
-  `codeql-action`, `dependency-review-action`).
-- **Binarios MIT-limpios.** El job de release **no** instala `imageio-ffmpeg`
-  (su FFmpeg es GPL). Los `build_*.sh` locales sí lo instalan.
-- **`gh` con `--target $SHA`** crea el tag anotado en el commit exacto que pasó
-  la CI, no en el estado de `main` en el momento del build.
+- **Release trigger = a version bump, not every commit.** `main` gets many
+  merges; only the ones that bump `__version__` publish. Avoids noisy
+  releases and gives explicit control via a one-line diff.
+- **CI is defined once.** `ci.yml` has `workflow_call`; `release.yml` reuses
+  it with `uses:` instead of duplicating the jobs. `ci.yml` does **not**
+  trigger on push to `main` (`release.yml` does), so there's no double run.
+- **No third-party actions to publish.** The release is created with the
+  `gh` CLI (preinstalled) and `GITHUB_TOKEN`; the only external actions are
+  GitHub's official ones (`checkout`, `setup-python`,
+  `upload/download-artifact`, `codeql-action`, `dependency-review-action`).
+- **MIT-clean binaries.** The release job **does not** install
+  `imageio-ffmpeg` (its FFmpeg is GPL). The local `build_*.sh` scripts do
+  install it.
+- **`gh` with `--target $SHA`** creates the annotated tag on the exact
+  commit that passed CI, not on whatever state `main` is in at build time.
 
 ---
 
-## Límites de escala y rendimiento
+## Scale and performance limits
 
-Benchmark: `N=3000 python scripts/benchmark.py`. En el equipo de desarrollo
-(imágenes sintéticas 800×600, todos los núcleos):
+Benchmark: `N=3000 python scripts/benchmark.py`. On the development machine
+(synthetic 800×600 images, all cores):
 
-| Escenario | 3 000 imágenes | pico RSS |
+| Scenario | 3,000 images | peak RSS |
 |---|---|---|
-| Detección exacta (SHA-256 + pixel) | ~4 s | ~210 MB |
-| + motor de similitud combinado | ~8,5 s | ~215 MB |
-| Reanálisis incremental | ~0,1 s | — |
+| Exact detection (SHA-256 + pixel) | ~4 s | ~210 MB |
+| + combined similarity engine | ~8.5 s | ~215 MB |
+| Incremental re-analysis | ~0.1 s | — |
 
-El **pico de RSS se mantiene plano** al crecer N: hashes en *streaming*,
-imágenes decodificadas de una en una y liberadas, caché de miniaturas LRU
-(máx. 400). Sin fuga de memoria en la UI navegando cientos de grupos.
-Extrapolación lineal: 100 000 imágenes ≈ 2 min (exacto) / ≈ 5 min
-(+ similitud); luego el incremental es de segundos.
-
----
-
-## Limitaciones conocidas
-
-- **Grupos solapados/anidados para imágenes.** Una familia de variantes
-  (original + copia exacta + reducida + editada + recorte) puede quedar en 2-3
-  grupos que comparten el original *por referencia* en vez de un único grupo.
-  Cada grupo es coherente y etiquetado. (Para vídeo ya está resuelto: la capa
-  de vídeo fusiona byte-idéntico + recomprimido en un grupo.)
-- **Cobertura de traducción EN parcial.** El mecanismo está completo; faltan
-  cadenas dinámicas y algunos diálogos. Se amplía añadiendo entradas a
-  `app/i18n.py::_EN`.
-- **`use_gpu`** en la configuración no tiene efecto (no hay ruta GPU; el flag
-  se deja para el futuro).
-- **`FileCacheDB.prune_missing()`** existe pero `run_analysis` no la llama
-  automáticamente (riesgo si el *root* analizado es una subcarpeta). Falta
-  decidir la política o exponer un "limpiar caché".
-- **Empaquetado.** GitHub Actions compila las tres plataformas en cada release
-  (nativo, no cross-compilación). macOS solo se compila para Apple Silicon
-  (`arm64`); falta un runner Intel si se quiere `x86_64`. Los binarios van sin
-  firmar (no hay certificados de Apple/Microsoft).
+**Peak RSS stays flat** as N grows: streaming hashes, images decoded one at
+a time and released, an LRU thumbnail cache (max 400). No UI memory leak
+browsing hundreds of groups. Linear extrapolation: 100,000 images ≈ 2 min
+(exact) / ≈ 5 min (+ similarity); the incremental run is then a matter of
+seconds.
 
 ---
 
-## Ideas para más adelante
+## Known limitations
 
-- Grafo de similitud único totalmente fusionado (resuelve la limitación de
-  arriba).
-- `database/prune`: limpiar filas de la caché cuyos archivos ya no existen.
-- Export que combine el estado actual + el historial de operaciones.
-- i18n completo + más idiomas.
-- Recorte proporcional (mismo aspecto) además del recorte con cambio de aspecto.
-- Firmar/notarizar los binarios (certificados de Apple y de firma de código de
-  Windows) para quitar los avisos de "app sin identificar".
-- Runner de macOS Intel para publicar también `x86_64`; AppImage/`.deb` para
-  Linux; publicar en PyPI.
-- `--cov-fail-under` y subir la cobertura a un servicio (hoy es informativa).
+- **Overlapping/nested groups for images.** A family of variants (original +
+  exact copy + downscaled + edited + crop) can end up in 2-3 groups that
+  share the original *by reference* instead of a single group. Each group
+  is still coherent and labeled. (Already solved for video: the video layer
+  merges byte-identical + re-encoded into one group.)
+- **Partial EN translation coverage.** The mechanism is complete; some
+  dynamic strings and dialogs are still missing. Extended by adding entries
+  to `app/i18n.py::_EN`.
+- **`use_gpu`** in the settings has no effect (there is no GPU path yet; the
+  flag is reserved for the future).
+- **`FileCacheDB.prune_missing()`** exists but `run_analysis` doesn't call it
+  automatically (a risk if the analyzed *root* is a subfolder). The policy,
+  or a "clear cache" action, still needs deciding.
+- **Packaging.** GitHub Actions builds all three platforms on every release
+  (native, no cross-compilation). macOS only builds for Apple Silicon
+  (`arm64`); an Intel runner is still needed for `x86_64`. Binaries ship
+  unsigned (no Apple/Microsoft certificates).
+- **Country-level geocoding, not region-level.** `country_borders.json` is
+  simplified at 1:50m: the resolution is *country*, not city or region, and
+  near a land border the result can fall on the wrong side by a few hundred
+  meters. Complex enclaves aren't read with full accuracy.
+- **Import: the library's first indexing pass.** Detecting "identical
+  pixels" against the whole library means reading every image's header the
+  first time (it then goes into `FileCacheDB`). On a huge library (millions
+  of files) that first indexing pass is slow; identical SHA-256 is always
+  cheap (size prefilter).
+
+---
+
+## Ideas for later
+
+- A single, fully merged similarity graph (solves the limitation above).
+- `database/prune`: clear cache rows whose files no longer exist.
+- An export that combines current state + the operation history.
+- Full i18n + more languages.
+- Proportional cropping (same aspect ratio) in addition to crops that change
+  the aspect ratio.
+- Sign/notarize the binaries (Apple and Windows code-signing certificates)
+  to remove the "unidentified app" warnings.
+- A macOS Intel runner to also publish `x86_64`; an AppImage/`.deb` for
+  Linux; publish to PyPI.
+- `--cov-fail-under` and uploading coverage to a service (informational
+  only today).

@@ -83,9 +83,7 @@ jobs:
           cache: pip
 
       - name: Install build dependencies
-        run: |
-          python -m pip install -r requirements.txt
-          python -m pip install "pyinstaller>=6.0"
+        run: python -m pip install -e ".[dev]"
         # NOTE: imageio-ffmpeg is deliberately NOT installed. Its bundled FFmpeg
         # is GPL; shipping it would force the whole binary under the GPL. PixMatch
         # binaries stay MIT-clean and detect a system FFmpeg at runtime for video.
@@ -184,19 +182,19 @@ jobs:
           set -euo pipefail
           NOTES_FILE="$(mktemp)"
           cat > "$NOTES_FILE" <<'EOF'
-          ## Descargas
+          ## Downloads
 
-          | Sistema | Archivo |
+          | OS | File |
           |---|---|
-          | **Windows 10/11 (x64)** | `PixMatch-VERSION-windows-x64.zip` — descomprime y ejecuta `PixMatch.exe` |
-          | **macOS (Apple Silicon)** | `PixMatch-VERSION-macos-arm64.zip` — al abrir por primera vez: clic derecho → *Abrir* |
-          | **Linux (x86-64)** | `PixMatch-VERSION-linux-x86_64.tar.gz` — extrae y ejecuta `./PixMatch/PixMatch` |
+          | **Windows 10/11 (x64)** | `PixMatch-VERSION-windows-x64.zip` — unzip and run `PixMatch.exe` |
+          | **macOS (Apple Silicon)** | `PixMatch-VERSION-macos-arm64.zip` — first run: right-click → *Open* |
+          | **Linux (x86-64)** | `PixMatch-VERSION-linux-x86_64.tar.gz` — extract and run `./PixMatch/PixMatch` |
 
-          No hace falta instalar Python ni nada más para analizar **imágenes**.
-          Para analizar **vídeos**, instala FFmpeg (`winget install Gyan.FFmpeg`,
-          `brew install ffmpeg`, `apt install ffmpeg`); PixMatch lo detecta solo.
+          No need to install Python or anything else to analyze **images**.
+          To analyze **video**, install FFmpeg (`winget install Gyan.FFmpeg`,
+          `brew install ffmpeg`, `apt install ffmpeg`); PixMatch detects it on its own.
 
-          Los binarios no están firmados. Verifica la descarga con `SHA256SUMS.txt`.
+          Binaries are unsigned. Verify the download against `SHA256SUMS.txt`.
           EOF
           sed -i "s/VERSION/${VERSION}/g" "$NOTES_FILE"
           gh release create "$TAG" \

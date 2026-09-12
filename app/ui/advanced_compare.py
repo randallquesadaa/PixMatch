@@ -1,10 +1,11 @@
 """Detailed comparison for *similar* (not identical) images.
 
-Modes:
-  * Normal        - one image at a time
-  * Lado a lado   - A and B next to each other
-  * Diferencia    - a map of where A and B differ (optionally amplified)
-  * Superposición - A and B blended, with an opacity slider
+Modes (internal key -> UI label, which stays in the UI's Spanish source
+language):
+  * normal  ("Normal")        - one image at a time
+  * side    ("Lado a lado")   - A and B next to each other
+  * diff    ("Diferencia")    - a map of where A and B differ (optionally amplified)
+  * overlay ("Superposición") - A and B blended, with an opacity slider
 
 Read-only. Nothing is written to disk.
 """

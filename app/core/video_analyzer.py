@@ -42,6 +42,7 @@ class VideoInfo:
     has_audio: bool = False
     audio_codec: str = ""
     creation_time: str | None = None
+    location: str | None = None  # raw ISO 6709 string, e.g. "+37.78-122.40/"
     error: str | None = None
 
     @property
@@ -103,6 +104,11 @@ def _probe_with_ffprobe(path: str, ffprobe: str) -> VideoInfo:
     info.audio_codec = str(audio.get("codec_name") or "") if audio else ""
     tags = fmt.get("tags", {}) or {}
     info.creation_time = tags.get("creation_time")
+    info.location = (
+        tags.get("location")
+        or tags.get("com.apple.quicktime.location.ISO6709")
+        or tags.get("location-eng")
+    )
     if info.duration <= 0:
         info.error = "Duración desconocida."
     return info
@@ -114,6 +120,7 @@ _VIDEO_RE = re.compile(r"Stream #\d+:\d+.*?: Video:\s*(\w+).*?(\d{2,5})x(\d{2,5}
 _FPS_RE = re.compile(r"([\d.]+)\s*fps")
 _AUDIO_RE = re.compile(r"Stream #\d+:\d+.*?: Audio:\s*(\w+)")
 _CREATION_RE = re.compile(r"creation_time\s*:\s*(\S+)")
+_LOCATION_RE = re.compile(r"\blocation(?:-eng)?\s*:\s*([+-][\d.]+[+-][\d.]+\S*)")
 
 
 def _probe_with_ffmpeg(path: str, ffmpeg: str) -> VideoInfo:
@@ -149,6 +156,9 @@ def _probe_with_ffmpeg(path: str, ffmpeg: str) -> VideoInfo:
     m = _CREATION_RE.search(text)
     if m:
         info.creation_time = m.group(1)
+    m = _LOCATION_RE.search(text)
+    if m:
+        info.location = m.group(1)
 
     if info.width == 0 and info.duration == 0:
         info.error = "No se pudo leer la información del vídeo."

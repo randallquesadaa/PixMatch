@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # ---- Python packages (requirements.txt + pyproject.toml) ----
+  # ---- Python packages (pyproject.toml) ----
   - package-ecosystem: pip
     directory: "/"
     schedule:
