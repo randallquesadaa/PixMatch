@@ -16,9 +16,9 @@ jobs:
       contents: read
       pull-requests: write # post the summary comment on failure
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Review dependency changes for known vulnerabilities
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
